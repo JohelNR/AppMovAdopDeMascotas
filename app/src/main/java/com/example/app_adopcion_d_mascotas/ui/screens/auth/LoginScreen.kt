@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pets
 import androidx.compose.material3.*
@@ -37,13 +39,21 @@ fun LoginScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Icono y Título
-        Icon(
-            imageVector = Icons.Default.Pets,
-            contentDescription = "Logo",
-            modifier = Modifier.size(64.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
+        // Logo oficial con insignia circular cálida
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primaryContainer,
+            modifier = Modifier.size(80.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Default.Pets,
+                    contentDescription = "Logo",
+                    modifier = Modifier.size(44.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.height(12.dp))
 
@@ -139,9 +149,12 @@ fun LoginScreen(
                 // Validación básica de formato
                 if (!email.contains("@") || email.isBlank()) {
                     errorMessage = "Por favor ingresa un correo válido con @"
-                } else if (password.length < 6) {
-                    errorMessage = "La contraseña debe tener al menos 6 caracteres"
-                } else {
+                } else if (password.length < 8) {
+                    errorMessage = "La contraseña debe tener al menos 8 caracteres"
+                } else if (email.first().isDigit()) {
+                    errorMessage = "El correo no puede comenzar con un número"
+                } else
+                {
                     // Éxito: creamos el usuario simulado con el rol elegido
                     val user = User(
                         id = "user_01",
@@ -152,11 +165,16 @@ fun LoginScreen(
                     onLoginSuccess(user)
                 }
             },
+            shape = RoundedCornerShape(12.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp)
+                .height(50.dp)
         ) {
-            Text(if (isRegisterMode) "Registrarse" else "Ingresar")
+            Text(
+                text = if (isRegisterMode) "Registrarse" else "Ingresar",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+            )
         }
 
         // Alternar entre Iniciar Sesión y Registrarse
@@ -195,7 +213,10 @@ fun LoginScreen(
                 )
                 onLoginSuccess(googleUser)
             },
-            modifier = Modifier.fillMaxWidth()
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
         ) {
             Text("Continuar con Google (Simulado)")
         }
@@ -213,7 +234,10 @@ fun LoginScreen(
                 )
                 onLoginSuccess(appleUser)
             },
-            modifier = Modifier.fillMaxWidth()
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
         ) {
             Text("Continuar con Apple (Simulado)")
         }

@@ -30,7 +30,7 @@ object PetRepository {
             description = "Tranquila, curiosa y le encanta dormir en lugares cálidos.",
             imageUrl = "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=500",
             shelterName = "Amor Animal",
-            isUrgent = false,
+            isUrgent = true,
             status = PetStatus.DISPONIBLE
         ),
         Pet(

@@ -205,11 +205,12 @@ fun PetDetailScreen(
                         } else {
                             Button(
                                 onClick = { adoptionRequested = true },
+                                shape = RoundedCornerShape(14.dp),
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(50.dp)
+                                    .height(52.dp)
                             ) {
-                                Text("🐾 Solicitar Adopción", fontSize = 16.sp)
+                                Text("🐾 ¡Quiero darle un hogar!", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     } else if (currentUser?.role == UserRole.REFUGIO) {
@@ -228,11 +229,14 @@ fun PetDetailScreen(
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.secondary
                             ),
-                            modifier = Modifier.fillMaxWidth()
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
                         ) {
                             Icon(Icons.Default.Check, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Marcar como Adoptada")
+                            Text("Marcar como Adoptada", fontWeight = FontWeight.Bold)
                         }
 
                         Spacer(modifier = Modifier.height(8.dp))
@@ -240,7 +244,10 @@ fun PetDetailScreen(
                         // Botón Editar
                         OutlinedButton(
                             onClick = { onEditClick(pet.id) },
-                            modifier = Modifier.fillMaxWidth()
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
                         ) {
                             Icon(Icons.Default.Edit, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
@@ -255,7 +262,10 @@ fun PetDetailScreen(
                             colors = ButtonDefaults.outlinedButtonColors(
                                 contentColor = MaterialTheme.colorScheme.error
                             ),
-                            modifier = Modifier.fillMaxWidth()
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
                         ) {
                             Icon(Icons.Default.Delete, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))

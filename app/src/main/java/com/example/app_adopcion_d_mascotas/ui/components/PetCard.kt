@@ -25,9 +25,10 @@ fun PetCard(
     modifier: Modifier = Modifier
 ) {
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
+            containerColor = MaterialTheme.colorScheme.surface
         ),
         modifier = modifier
             .fillMaxWidth()
@@ -92,7 +93,7 @@ fun PetCard(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = "${pet.breed} • ${pet.ageYears} años",
+                    text = "${pet.species} • ${pet.breed} • ${pet.ageYears} años",
                     fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                 )
@@ -108,13 +109,19 @@ fun PetCard(
 
                 // Indicador si ya fue adoptada
                 if (pet.status == PetStatus.ADOPTADA) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "🎉 ¡Adoptada!",
-                        color = MaterialTheme.colorScheme.secondary,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp
-                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            text = "🎉 ¡Adoptada!",
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
                 }
             }
         }

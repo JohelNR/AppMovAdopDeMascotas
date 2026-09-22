@@ -182,9 +182,14 @@ fun CreateEditPetScreen(
                     val age = ageText.toIntOrNull()
                     if (name.isBlank() || breed.isBlank() || description.isBlank()) {
                         errorMessage = "Por favor completa todos los campos"
+                    } else if (name.length < 3) {
+                        errorMessage = "El nombre debe tener al menos 3 caracteres"
                     } else if (age == null || age < 0) {
                         errorMessage = "Ingresa una edad válida en números"
-                    } else {
+                    } else if (age > 20) {
+                        errorMessage = "la edad debe ser menor a 20"
+                    } else
+                     {
                         // Creamos o actualizamos el objeto Mascota
                         val petToSave = Pet(
                             id = existingPet?.id ?: "pet_${System.currentTimeMillis()}",
