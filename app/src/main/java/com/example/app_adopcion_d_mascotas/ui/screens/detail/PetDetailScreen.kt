@@ -1,6 +1,9 @@
 package com.example.app_adopcion_d_mascotas.ui.screens.detail
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -9,12 +12,15 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -33,13 +39,12 @@ fun PetDetailScreen(
     onBackClick: () -> Unit,
     onEditClick: (String) -> Unit,
     onDeleteClick: (String) -> Unit,
-    onMarkAdoptedClick: (String) -> Unit
+    onMarkAdoptedClick: (String) -> Unit,
+    onAdoptClick: (String) -> Unit
 ) {
-    // Estado local para mostrar un mensaje al solicitar adopción
-    var adoptionRequested by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     if (pet == null) {
-        // Por seguridad, si la mascota no existe
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text("Mascota no encontrada")
         }
@@ -67,18 +72,48 @@ fun PetDetailScreen(
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
         ) {
-            // 1. Foto Grande de la mascota (RF4)
-            AsyncImage(
-                model = pet.imageUrl,
-                contentDescription = "Foto de ${pet.name}",
-                contentScale = ContentScale.Crop,
+            val allPhotos = pet.getAllPhotoUrls()
+
+            // RF3 & RF4: Carrusel de Fotos Reales (hasta 5)
+            if (allPhotos.size > 1) {
+                LazyRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(280.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp)
+                ) {
+                    items(allPhotos) { photoUrl ->
+                        AsyncImage(
+                            model = photoUrl,
+                            contentDescription = "Foto de ${pet.name}",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .width(300.dp)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(16.dp))
+                        )
+                    }
+                }
+            } else {
+                AsyncImage(
+                    model = pet.displayPhoto,
+                    contentDescription = "Foto de ${pet.name}",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(280.dp)
+                        .padding(horizontal = 16.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                )
+            }
+
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(260.dp)
-            )
-
-            Column(modifier = Modifier.padding(20.dp)) {
-                // Nombre y Badge de Urgente
+                    .padding(20.dp)
+            ) {
+                // Fila de Título y Badges
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -87,81 +122,81 @@ fun PetDetailScreen(
                     Text(
                         text = pet.name,
                         fontSize = 28.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
 
                     if (pet.isUrgent) {
                         Surface(
-                            color = MaterialTheme.colorScheme.errorContainer,
+                            color = MaterialTheme.colorScheme.error,
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Warning,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "URGENTE",
-                                    color = MaterialTheme.colorScheme.error,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
+                            Text(
+                                text = "CASO URGENTE",
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
                         }
                     }
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Ficha Rápida: Especie, Raza y Edad
+                // Fila de Características (RF6)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    AssistChip(onClick = {}, label = { Text(pet.species) })
+                    AssistChip(onClick = {}, label = { Text("${pet.ageYears} años") })
+                    AssistChip(onClick = {}, label = { Text(pet.gender) })
+                    AssistChip(onClick = {}, label = { Text(pet.size) })
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Ubicación y Refugio
                 Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
-                        modifier = Modifier.padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceAround
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Especie", fontSize = 12.sp, color = MaterialTheme.colorScheme.outline)
-                            Text(pet.species, fontWeight = FontWeight.Bold)
-                        }
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Raza", fontSize = 12.sp, color = MaterialTheme.colorScheme.outline)
-                            Text(pet.breed, fontWeight = FontWeight.Bold)
-                        }
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Edad", fontSize = 12.sp, color = MaterialTheme.colorScheme.outline)
-                            Text("${pet.ageYears} años", fontWeight = FontWeight.Bold)
+                        Icon(
+                            imageVector = Icons.Default.LocationOn,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = "Refugio: ${pet.shelterName}",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                            Text(
+                                text = "Ubicación: ${pet.location}",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Refugio de Origen
                 Text(
-                    text = "Refugio responsable: ${pet.shelterName}",
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Historia y Descripción (RF4)
-                Text(
-                    text = "Acerca de ${pet.name}",
+                    text = "Historia y Personalidad",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
+
                 Spacer(modifier = Modifier.height(6.dp))
+
                 Text(
                     text = pet.description,
                     fontSize = 15.sp,
@@ -169,111 +204,120 @@ fun PetDetailScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(28.dp))
 
-                // Estado de Adopción
+                // ACCIONES SEGÚN ROL
+
+                // Si es Adoptante (o si la mascota sigue disponible) -> Solicitar Adopción (RF8)
+                if (currentUser?.role != UserRole.REFUGIO && pet.status == PetStatus.DISPONIBLE) {
+                    Button(
+                        onClick = { onAdoptClick(pet.id) },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp)
+                    ) {
+                        Icon(imageVector = Icons.Default.Favorite, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Solicitar Adopción (Formulario)",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
                 if (pet.status == PetStatus.ADOPTADA) {
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer
-                        ),
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = "🎉 ¡Esta mascota ya fue adoptada!",
+                            text = "🎉 Esta mascota ya fue felizmente adoptada.",
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
                             fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
                             modifier = Modifier.padding(16.dp)
                         )
                     }
-                } else {
-                    // Acciones si está Disponible:
-                    if (currentUser?.role == UserRole.ADOPTANTE) {
-                        // Acción para Adoptante (RF4)
-                        if (adoptionRequested) {
-                            Card(
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                                ),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(
-                                    text = "✅ ¡Solicitud enviada al refugio con éxito!",
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(16.dp)
-                                )
-                            }
-                        } else {
-                            Button(
-                                onClick = { adoptionRequested = true },
-                                shape = RoundedCornerShape(14.dp),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(52.dp)
-                            ) {
-                                Text("🐾 ¡Quiero darle un hogar!", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    } else if (currentUser?.role == UserRole.REFUGIO) {
-                        // Acciones de Gestión para Refugio (RF3 CRUD)
-                        Text(
-                            text = "Gestión del Refugio (CRUD)",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
-                        )
+                }
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                // Si es Refugio -> Acciones de Administración (Editar, Borrar, Marcar Adoptada)
+                if (currentUser?.role == UserRole.REFUGIO) {
+                    Text(
+                        text = "Panel de Gestión del Refugio",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
 
-                        // Botón Marcar como Adoptada
-                        Button(
-                            onClick = { onMarkAdoptedClick(pet.id) },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.secondary
-                            ),
-                            shape = RoundedCornerShape(14.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp)
-                        ) {
-                            Icon(Icons.Default.Check, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Marcar como Adoptada", fontWeight = FontWeight.Bold)
-                        }
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // Botón Editar
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         OutlinedButton(
                             onClick = { onEditClick(pet.id) },
-                            shape = RoundedCornerShape(14.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp)
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f)
                         ) {
-                            Icon(Icons.Default.Edit, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Editar Publicación")
+                            Icon(imageVector = Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Editar")
                         }
 
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // Botón Eliminar
                         OutlinedButton(
-                            onClick = { onDeleteClick(pet.id) },
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = MaterialTheme.colorScheme.error
-                            ),
-                            shape = RoundedCornerShape(14.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp)
+                            onClick = { showDeleteDialog = true },
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f)
                         ) {
-                            Icon(Icons.Default.Delete, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Eliminar Publicación")
+                            Icon(imageVector = Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Eliminar")
+                        }
+                    }
+
+                    if (pet.status == PetStatus.DISPONIBLE) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(
+                            onClick = { onMarkAdoptedClick(pet.id) },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(imageVector = Icons.Default.Check, contentDescription = null)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Marcar como Adoptada")
                         }
                     }
                 }
             }
         }
+    }
+
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("¿Eliminar publicación?") },
+            text = { Text("Esta acción retirará a ${pet.name} de la base de datos en la nube.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteDialog = false
+                        onDeleteClick(pet.id)
+                    }
+                ) {
+                    Text("Eliminar", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
     }
 }
