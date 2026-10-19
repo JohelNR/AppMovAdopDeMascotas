@@ -9,6 +9,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.app_adopcion_d_mascotas.data.model.User
 import com.example.app_adopcion_d_mascotas.data.repository.AppwritePetRepository
+import com.example.app_adopcion_d_mascotas.ui.components.AppBackground
 import com.example.app_adopcion_d_mascotas.ui.screens.appointments.AppointmentsScreen
 import com.example.app_adopcion_d_mascotas.ui.screens.auth.LoginScreen
 import com.example.app_adopcion_d_mascotas.ui.screens.detail.PetDetailScreen
@@ -33,7 +34,8 @@ fun AppNavigation() {
     // 3. Estado en memoria del usuario actualmente conectado
     var currentUser by remember { mutableStateOf<User?>(null) }
 
-    // 4. El NavHost que decide qué pantalla mostrar según la ruta activa
+    // 4. El NavHost envuelto en AppBackground para el fondo con huellitas en toda la app
+    AppBackground {
     NavHost(
         navController = navController,
         startDestination = Screen.Login.route
@@ -184,4 +186,5 @@ fun AppNavigation() {
             )
         }
     }
+    } // fin AppBackground
 }
