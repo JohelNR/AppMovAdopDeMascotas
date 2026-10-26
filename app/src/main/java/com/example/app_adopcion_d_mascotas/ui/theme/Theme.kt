@@ -8,15 +8,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 // Esquema de Colores Oficial para Adopta Huellitas
-private val LightColorScheme = lightColorScheme(
+// Un solo esquema oscuro para toda la app (fondo marrón oscuro cálido)
+private val AppColorScheme = darkColorScheme(
     primary = WarmOrange,
     onPrimary = Color.White,
-    primaryContainer = WarmOrangeContainer,
-    onPrimaryContainer = OnWarmOrangeContainer,
+    primaryContainer = Color(0xFF5C2A00),
+    onPrimaryContainer = Color(0xFFFFDCC2),
     secondary = SoftTeal,
     onSecondary = Color.White,
-    secondaryContainer = SoftTealContainer,
-    onSecondaryContainer = OnSoftTealContainer,
+    secondaryContainer = Color(0xFF00504A),
+    onSecondaryContainer = Color(0xFFB2DFDB),
     background = WarmBackground,
     onBackground = OnSurfaceText,
     surface = WarmSurface,
@@ -24,29 +25,20 @@ private val LightColorScheme = lightColorScheme(
     surfaceVariant = WarmSurfaceVariant,
     onSurfaceVariant = OnSurfaceVariantText,
     error = UrgentRed,
-    errorContainer = UrgentRedContainer,
+    errorContainer = Color(0xFF5C0A0A),
     onError = Color.White,
-    onErrorContainer = UrgentRed
-)
-
-private val DarkColorScheme = darkColorScheme(
-    primary = WarmOrange,
-    secondary = SoftTeal,
-    background = Color(0xFF1E1A18),
-    surface = Color(0xFF2B2522)
+    onErrorContainer = Color(0xFFFFB4B4)
 )
 
 @Composable
 fun AppAdopcionDMascotasTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    // Lo dejamos en false para que SIEMPRE use nuestros colores hermosos y no el gris genérico de Android
+    // Siempre usamos nuestro esquema oscuro/cálido para toda la app
+    darkTheme: Boolean = true,
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
-
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = AppColorScheme,
         typography = Typography,
         content = content
     )

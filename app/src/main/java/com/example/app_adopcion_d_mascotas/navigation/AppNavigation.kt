@@ -9,6 +9,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.app_adopcion_d_mascotas.data.model.User
 import com.example.app_adopcion_d_mascotas.data.repository.AppwritePetRepository
+import com.example.app_adopcion_d_mascotas.ui.components.AppBackground
 import com.example.app_adopcion_d_mascotas.ui.screens.appointments.AppointmentsScreen
 import com.example.app_adopcion_d_mascotas.ui.screens.auth.LoginScreen
 import com.example.app_adopcion_d_mascotas.ui.screens.chat.ChatScreen
@@ -36,256 +37,258 @@ fun AppNavigation() {
     // 3. Estado en memoria del usuario actualmente conectado
     var currentUser by remember { mutableStateOf<User?>(null) }
 
-    // 4. El NavHost que decide qué pantalla mostrar según la ruta activa
-    NavHost(
-        navController = navController,
-        startDestination = Screen.Login.route
-    ) {
-        // RUTA 1: Login y Registro (RF1)
-        composable(Screen.Login.route) {
-            LoginScreen(
-                onLoginSuccess = { loggedUser ->
-                    currentUser = loggedUser
-                    feedViewModel.loadPets()
-                    // Navegamos al Feed y limpiamos el Login del historial
-                    navController.navigate(Screen.Feed.route) {
-                        popUpTo(Screen.Login.route) { inclusive = true }
+    // 4. El NavHost envuelto en AppBackground para el fondo con huellitas en toda la app
+    AppBackground {
+        NavHost(
+            navController = navController,
+            startDestination = Screen.Login.route
+        ) {
+            // RUTA 1: Login y Registro (RF1)
+            composable(Screen.Login.route) {
+                LoginScreen(
+                    onLoginSuccess = { loggedUser ->
+                        currentUser = loggedUser
+                        feedViewModel.loadPets()
+                        // Navegamos al Feed y limpiamos el Login del historial
+                        navController.navigate(Screen.Feed.route) {
+                            popUpTo(Screen.Login.route) { inclusive = true }
+                        }
                     }
-                }
-            )
-        }
+                )
+            }
 
-        // RUTA 2: Catálogo / Feed de Mascotas con Filtros y Búsqueda (RF4, RF5, RF6)
-        composable(Screen.Feed.route) {
-            FeedScreen(
-                currentUser = currentUser,
-                feedViewModel = feedViewModel,
-                onPetClick = { petId ->
-                    navController.navigate(Screen.Detail.createRoute(petId))
-                },
-                onAddPetClick = {
-                    navController.navigate(Screen.Publish.createRoute())
-                },
-                onRequestsClick = {
-                    navController.navigate(Screen.Requests.route)
-                },
-                onAppointmentsClick = {
-                    navController.navigate(Screen.Appointments.route)
-                },
-                onProfileClick = {
-                    navController.navigate(Screen.Profile.route)
-                },
-                onLogoutClick = {
-                    currentUser = null
-                    navController.navigate(Screen.Login.route) {
-                        popUpTo(0) { inclusive = true }
+            // RUTA 2: Catálogo / Feed de Mascotas con Filtros y Búsqueda (RF4, RF5, RF6)
+            composable(Screen.Feed.route) {
+                FeedScreen(
+                    currentUser = currentUser,
+                    feedViewModel = feedViewModel,
+                    onPetClick = { petId ->
+                        navController.navigate(Screen.Detail.createRoute(petId))
+                    },
+                    onAddPetClick = {
+                        navController.navigate(Screen.Publish.createRoute())
+                    },
+                    onRequestsClick = {
+                        navController.navigate(Screen.Requests.route)
+                    },
+                    onAppointmentsClick = {
+                        navController.navigate(Screen.Appointments.route)
+                    },
+                    onProfileClick = {
+                        navController.navigate(Screen.Profile.route)
+                    },
+                    onLogoutClick = {
+                        currentUser = null
+                        navController.navigate(Screen.Login.route) {
+                            popUpTo(0) { inclusive = true }
+                        }
                     }
-                }
-            )
-        }
+                )
+            }
 
-        // RUTA 3: Detalle de Mascota con carrusel de fotos (RF4), mapa (RF7), chat (RF13) y seguimiento (RF11)
-        composable(
-            route = Screen.Detail.route,
-            arguments = listOf(
-                navArgument("petId") { type = NavType.StringType }
-            )
-        ) { backStackEntry ->
-            val petId = backStackEntry.arguments?.getString("petId") ?: ""
-            val pet = feedViewModel.allPets.find { it.id == petId }
+            // RUTA 3: Detalle de Mascota con carrusel de fotos (RF4), mapa (RF7), chat (RF13) y seguimiento (RF11)
+            composable(
+                route = Screen.Detail.route,
+                arguments = listOf(
+                    navArgument("petId") { type = NavType.StringType }
+                )
+            ) { backStackEntry ->
+                val petId = backStackEntry.arguments?.getString("petId") ?: ""
+                val pet = feedViewModel.allPets.find { it.id == petId }
 
-            PetDetailScreen(
-                pet = pet,
-                currentUser = currentUser,
-                onBackClick = { navController.popBackStack() },
-                onEditClick = { id ->
-                    navController.navigate(Screen.Publish.createRoute(id))
-                },
-                onDeleteClick = { id ->
-                    coroutineScope.launch {
-                        AppwritePetRepository.deletePet(id)
+                PetDetailScreen(
+                    pet = pet,
+                    currentUser = currentUser,
+                    onBackClick = { navController.popBackStack() },
+                    onEditClick = { id ->
+                        navController.navigate(Screen.Publish.createRoute(id))
+                    },
+                    onDeleteClick = { id ->
+                        coroutineScope.launch {
+                            AppwritePetRepository.deletePet(id)
+                            feedViewModel.loadPets()
+                            navController.popBackStack()
+                        }
+                    },
+                    onMarkAdoptedClick = { id ->
+                        coroutineScope.launch {
+                            AppwritePetRepository.markAsAdopted(id)
+                            feedViewModel.loadPets()
+                            navController.popBackStack()
+                        }
+                    },
+                    onAdoptClick = { id ->
+                        navController.navigate(Screen.AdoptionForm.createRoute(id))
+                    },
+                    onChatClick = { chatId, petName ->
+                        navController.navigate(
+                            Screen.Chat.createRoute(
+                                chatId = chatId,
+                                petName = petName,
+                                receiverName = pet?.shelterName ?: "Refugio"
+                            )
+                        )
+                    },
+                    onFollowUpClick = { id ->
+                        navController.navigate(
+                            Screen.FollowUp.createRoute(
+                                petId = id,
+                                petName = pet?.name ?: "",
+                                shelterName = pet?.shelterName ?: "Refugio"
+                            )
+                        )
+                    }
+                )
+            }
+
+            // RUTA 4: Crear o Editar Mascota con subida real de fotos a Cloud Storage (RF3 CRUD)
+            composable(
+                route = Screen.Publish.route,
+                arguments = listOf(
+                    navArgument("petId") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    }
+                )
+            ) { backStackEntry ->
+                val petId = backStackEntry.arguments?.getString("petId")
+                val existingPet = petId?.let { id -> feedViewModel.allPets.find { it.id == id } }
+
+                CreateEditPetScreen(
+                    existingPet = existingPet,
+                    currentUser = currentUser,
+                    onBackClick = { navController.popBackStack() },
+                    onSavedSuccessfully = {
                         feedViewModel.loadPets()
                         navController.popBackStack()
                     }
-                },
-                onMarkAdoptedClick = { id ->
-                    coroutineScope.launch {
-                        AppwritePetRepository.markAsAdopted(id)
-                        feedViewModel.loadPets()
+                )
+            }
+
+            // RUTA 5: Formulario de Postulación de Adopción (RF8)
+            composable(
+                route = Screen.AdoptionForm.route,
+                arguments = listOf(
+                    navArgument("petId") { type = NavType.StringType }
+                )
+            ) { backStackEntry ->
+                val petId = backStackEntry.arguments?.getString("petId") ?: ""
+                val pet = feedViewModel.allPets.find { it.id == petId }
+
+                AdoptionFormScreen(
+                    pet = pet,
+                    currentUser = currentUser,
+                    requestsViewModel = requestsViewModel,
+                    onBackClick = { navController.popBackStack() },
+                    onRequestSubmitted = {
                         navController.popBackStack()
+                        navController.navigate(Screen.Requests.route)
                     }
-                },
-                onAdoptClick = { id ->
-                    navController.navigate(Screen.AdoptionForm.createRoute(id))
-                },
-                onChatClick = { chatId, petName ->
-                    navController.navigate(
-                        Screen.Chat.createRoute(
-                            chatId = chatId,
-                            petName = petName,
-                            receiverName = pet?.shelterName ?: "Refugio"
-                        )
-                    )
-                },
-                onFollowUpClick = { id ->
-                    navController.navigate(
-                        Screen.FollowUp.createRoute(
-                            petId = id,
-                            petName = pet?.name ?: "",
-                            shelterName = pet?.shelterName ?: "Refugio"
-                        )
-                    )
-                }
-            )
-        }
+                )
+            }
 
-        // RUTA 4: Crear o Editar Mascota con subida real de fotos a Cloud Storage (RF3 CRUD)
-        composable(
-            route = Screen.Publish.route,
-            arguments = listOf(
-                navArgument("petId") {
-                    type = NavType.StringType
-                    nullable = true
-                    defaultValue = null
-                }
-            )
-        ) { backStackEntry ->
-            val petId = backStackEntry.arguments?.getString("petId")
-            val existingPet = petId?.let { id -> feedViewModel.allPets.find { it.id == id } }
-
-            CreateEditPetScreen(
-                existingPet = existingPet,
-                currentUser = currentUser,
-                onBackClick = { navController.popBackStack() },
-                onSavedSuccessfully = {
-                    feedViewModel.loadPets()
-                    navController.popBackStack()
-                }
-            )
-        }
-
-        // RUTA 5: Formulario de Postulación de Adopción (RF8)
-        composable(
-            route = Screen.AdoptionForm.route,
-            arguments = listOf(
-                navArgument("petId") { type = NavType.StringType }
-            )
-        ) { backStackEntry ->
-            val petId = backStackEntry.arguments?.getString("petId") ?: ""
-            val pet = feedViewModel.allPets.find { it.id == petId }
-
-            AdoptionFormScreen(
-                pet = pet,
-                currentUser = currentUser,
-                requestsViewModel = requestsViewModel,
-                onBackClick = { navController.popBackStack() },
-                onRequestSubmitted = {
-                    navController.popBackStack()
-                    navController.navigate(Screen.Requests.route)
-                }
-            )
-        }
-
-        // RUTA 6: Panel de Solicitudes de Adopción y Cierre Automático RF10
-        composable(Screen.Requests.route) {
-            RequestsScreen(
-                currentUser = currentUser,
-                requestsViewModel = requestsViewModel,
-                feedViewModel = feedViewModel,
-                onBackClick = { navController.popBackStack() },
-                onGoToAppointments = {
-                    navController.navigate(Screen.Appointments.route)
-                }
-            )
-        }
-
-        // RUTA 7: Coordinación de Citas y Entrevistas (RF20)
-        composable(Screen.Appointments.route) {
-            AppointmentsScreen(
-                currentUser = currentUser,
-                requestsViewModel = requestsViewModel,
-                onBackClick = { navController.popBackStack() }
-            )
-        }
-
-        // RUTA 8: Perfil de Usuario con foto de avatar y gestión (RF2)
-        composable(Screen.Profile.route) {
-            ProfileScreen(
-                currentUser = currentUser,
-                onUserUpdated = { updated ->
-                    currentUser = updated
-                },
-                onBackClick = { navController.popBackStack() },
-                onLogoutClick = {
-                    currentUser = null
-                    navController.navigate(Screen.Login.route) {
-                        popUpTo(0) { inclusive = true }
+            // RUTA 6: Panel de Solicitudes de Adopción y Cierre Automático RF10
+            composable(Screen.Requests.route) {
+                RequestsScreen(
+                    currentUser = currentUser,
+                    requestsViewModel = requestsViewModel,
+                    feedViewModel = feedViewModel,
+                    onBackClick = { navController.popBackStack() },
+                    onGoToAppointments = {
+                        navController.navigate(Screen.Appointments.route)
                     }
-                },
-                onPetClick = { petId ->
-                    navController.navigate(Screen.Detail.createRoute(petId))
-                },
-                onChatClick = { chatId, receiverName ->
-                    navController.navigate(
-                        Screen.Chat.createRoute(
-                            chatId = chatId,
-                            receiverName = receiverName
+                )
+            }
+
+            // RUTA 7: Coordinación de Citas y Entrevistas (RF20)
+            composable(Screen.Appointments.route) {
+                AppointmentsScreen(
+                    currentUser = currentUser,
+                    requestsViewModel = requestsViewModel,
+                    onBackClick = { navController.popBackStack() }
+                )
+            }
+
+            // RUTA 8: Perfil de Usuario con foto de avatar y gestión (RF2)
+            composable(Screen.Profile.route) {
+                ProfileScreen(
+                    currentUser = currentUser,
+                    onUserUpdated = { updated ->
+                        currentUser = updated
+                    },
+                    onBackClick = { navController.popBackStack() },
+                    onLogoutClick = {
+                        currentUser = null
+                        navController.navigate(Screen.Login.route) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    },
+                    onPetClick = { petId ->
+                        navController.navigate(Screen.Detail.createRoute(petId))
+                    },
+                    onChatClick = { chatId, receiverName ->
+                        navController.navigate(
+                            Screen.Chat.createRoute(
+                                chatId = chatId,
+                                receiverName = receiverName
+                            )
                         )
-                    )
-                }
-            )
-        }
+                    }
+                )
+            }
 
-        // RUTA 9: Chat en Tiempo Real Adoptante - Refugio (RF13)
-        composable(
-            route = Screen.Chat.route,
-            arguments = listOf(
-                navArgument("chatId") { type = NavType.StringType },
-                navArgument("petName") {
-                    type = NavType.StringType
-                    defaultValue = ""
-                },
-                navArgument("receiverName") {
-                    type = NavType.StringType
-                    defaultValue = "Refugio"
-                }
-            )
-        ) { backStackEntry ->
-            val chatId = backStackEntry.arguments?.getString("chatId") ?: ""
-            val petName = backStackEntry.arguments?.getString("petName") ?: ""
-            val receiverName = backStackEntry.arguments?.getString("receiverName") ?: "Refugio"
+            // RUTA 9: Chat en Tiempo Real Adoptante - Refugio (RF13)
+            composable(
+                route = Screen.Chat.route,
+                arguments = listOf(
+                    navArgument("chatId") { type = NavType.StringType },
+                    navArgument("petName") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                    navArgument("receiverName") {
+                        type = NavType.StringType
+                        defaultValue = "Refugio"
+                    }
+                )
+            ) { backStackEntry ->
+                val chatId = backStackEntry.arguments?.getString("chatId") ?: ""
+                val petName = backStackEntry.arguments?.getString("petName") ?: ""
+                val receiverName = backStackEntry.arguments?.getString("receiverName") ?: "Refugio"
 
-            ChatScreen(
-                chatId = chatId,
-                petName = petName,
-                receiverName = receiverName,
-                onBackClick = { navController.popBackStack() }
-            )
-        }
+                ChatScreen(
+                    chatId = chatId,
+                    petName = petName,
+                    receiverName = receiverName,
+                    onBackClick = { navController.popBackStack() }
+                )
+            }
 
-        // RUTA 10: Formulario y Línea de Tiempo de Seguimiento Post-Adopción (RF11)
-        composable(
-            route = Screen.FollowUp.route,
-            arguments = listOf(
-                navArgument("petId") { type = NavType.StringType },
-                navArgument("petName") {
-                    type = NavType.StringType
-                    defaultValue = ""
-                },
-                navArgument("shelterName") {
-                    type = NavType.StringType
-                    defaultValue = "Refugio"
-                }
-            )
-        ) { backStackEntry ->
-            val petId = backStackEntry.arguments?.getString("petId") ?: ""
-            val pet = feedViewModel.allPets.find { it.id == petId }
+            // RUTA 10: Formulario y Línea de Tiempo de Seguimiento Post-Adopción (RF11)
+            composable(
+                route = Screen.FollowUp.route,
+                arguments = listOf(
+                    navArgument("petId") { type = NavType.StringType },
+                    navArgument("petName") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                    navArgument("shelterName") {
+                        type = NavType.StringType
+                        defaultValue = "Refugio"
+                    }
+                )
+            ) { backStackEntry ->
+                val petId = backStackEntry.arguments?.getString("petId") ?: ""
+                val pet = feedViewModel.allPets.find { it.id == petId }
 
-            FollowUpScreen(
-                pet = pet,
-                currentUser = currentUser,
-                onBackClick = { navController.popBackStack() }
-            )
+                FollowUpScreen(
+                    pet = pet,
+                    currentUser = currentUser,
+                    onBackClick = { navController.popBackStack() }
+                )
+            }
         }
     }
 }
