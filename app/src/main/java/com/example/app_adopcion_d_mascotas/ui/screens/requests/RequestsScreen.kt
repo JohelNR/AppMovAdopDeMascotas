@@ -19,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -46,6 +47,7 @@ fun RequestsScreen(
     val requests = requestsViewModel.requestsList
     val isLoading = requestsViewModel.isLoading
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
 
     // Mostrar feedback si existe
     LaunchedEffect(requestsViewModel.feedbackMessage) {
@@ -202,7 +204,7 @@ fun RequestsScreen(
                     onClick = {
                         val toAccept = req
                         requestToAccept = null
-                        requestsViewModel.acceptRequest(toAccept, currentUser) {
+                        requestsViewModel.acceptRequest(toAccept, currentUser, context = context) {
                             feedViewModel.loadPets()
                         }
                     },
@@ -234,6 +236,7 @@ fun RequestsScreen(
                     time = time,
                     modality = modality,
                     currentUser = currentUser,
+                    context = context,
                     onSuccess = {
                         requestToSchedule = null
                         onGoToAppointments()

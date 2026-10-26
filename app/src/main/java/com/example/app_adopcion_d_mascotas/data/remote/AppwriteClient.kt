@@ -4,6 +4,7 @@ import android.content.Context
 import io.appwrite.Client
 import io.appwrite.services.Account
 import io.appwrite.services.Databases
+import io.appwrite.services.Realtime
 import io.appwrite.services.Storage
 import io.appwrite.services.TablesDB
 
@@ -17,6 +18,8 @@ object AppwriteClient {
     const val USERS_COLLECTION = "6acf7f910021e8558b65"
     const val REQUESTS_COLLECTION = "6acf8155000ecaf2f811"
     const val APPOINTMENTS_COLLECTION = "6acf82b100251fdf4d9b"
+    const val FOLLOWUPS_COLLECTION = "seguimientos"
+    const val CHATS_COLLECTION = "mensajes"
 
     private lateinit var client: Client
     lateinit var account: Account
@@ -26,6 +29,8 @@ object AppwriteClient {
     lateinit var tablesDB: TablesDB
         private set
     lateinit var storage: Storage
+        private set
+    lateinit var realtime: Realtime
         private set
 
     fun init(context: Context) {
@@ -37,6 +42,7 @@ object AppwriteClient {
         databases = Databases(client)
         tablesDB = TablesDB(client)
         storage = Storage(client)
+        realtime = Realtime(client)
     }
 
     fun getFileViewUrl(fileId: String): String {

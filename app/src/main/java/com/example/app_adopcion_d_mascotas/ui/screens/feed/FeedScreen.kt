@@ -9,6 +9,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Clear
@@ -36,6 +37,7 @@ fun FeedScreen(
     onAddPetClick: () -> Unit,
     onRequestsClick: () -> Unit,
     onAppointmentsClick: () -> Unit,
+    onProfileClick: () -> Unit = {},
     onLogoutClick: () -> Unit
 ) {
     Scaffold(
@@ -81,6 +83,15 @@ fun FeedScreen(
                         Icon(
                             imageVector = Icons.Default.CalendarMonth,
                             contentDescription = "Citas",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    // Botón Mi Perfil (RF2)
+                    IconButton(onClick = onProfileClick) {
+                        Icon(
+                            imageVector = Icons.Default.AccountCircle,
+                            contentDescription = "Mi Perfil",
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }

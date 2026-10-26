@@ -123,7 +123,7 @@ fun PetCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = pet.name,
+                        text = if (pet.species == "Perro") pet.name + "🐶" else pet.name + "🐱",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface

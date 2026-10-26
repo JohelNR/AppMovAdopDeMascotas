@@ -50,11 +50,21 @@ object AppwriteRequestsRepository {
                 databaseId = AppwriteClient.DATABASE_ID,
                 collectionId = AppwriteClient.REQUESTS_COLLECTION,
                 queries = listOf(
-                    Query.equal("shelterNames", shelterName),
                     Query.orderDesc("\$createdAt")
                 )
             )
-            response.documents.map { docToRequest(it) }
+            val cleanTarget = shelterName.trim()
+            val allRequests = response.documents.map { docToRequest(it) }
+            if (cleanTarget.isNotBlank()) {
+                val filtered = allRequests.filter { 
+                    it.shelterName.trim().equals(cleanTarget, ignoreCase = true) ||
+                    cleanTarget.contains(it.shelterName.trim(), ignoreCase = true) ||
+                    it.shelterName.trim().contains(cleanTarget, ignoreCase = true)
+                }
+                if (filtered.isNotEmpty()) filtered else allRequests
+            } else {
+                allRequests
+            }
         } catch (e: Exception) {
             e.printStackTrace()
             emptyList()

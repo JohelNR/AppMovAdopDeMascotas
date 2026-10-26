@@ -1,5 +1,7 @@
 package com.example.app_adopcion_d_mascotas.navigation
 
+import android.net.Uri
+
 // Clase sellada que define todas las pantallas del flujo oficial de la app
 sealed class Screen(val route: String) {
 
@@ -9,7 +11,7 @@ sealed class Screen(val route: String) {
     // 2. Pantalla principal del catálogo de mascotas con búsqueda y filtros (RF4, RF5, RF6)
     object Feed : Screen("feed")
 
-    // 3. Pantalla de detalle de una mascota con carrusel de fotos (RF4)
+    // 3. Pantalla de detalle de una mascota con carrusel de fotos, mapa y accesos (RF4, RF7)
     object Detail : Screen("detail/{petId}") {
         fun createRoute(petId: String) = "detail/$petId"
     }
@@ -30,4 +32,25 @@ sealed class Screen(val route: String) {
 
     // 7. Coordinación y agenda de entrevistas / citas (RF20)
     object Appointments : Screen("appointments")
+
+    // 8. Perfil de Usuario con foto de avatar y gestión (RF2)
+    object Profile : Screen("profile")
+
+    // 9. Chat en Tiempo Real Adoptante - Refugio (RF13)
+    object Chat : Screen("chat/{chatId}?petName={petName}&receiverName={receiverName}") {
+        fun createRoute(chatId: String, petName: String = "", receiverName: String = "Refugio"): String {
+            val encodedPet = Uri.encode(petName)
+            val encodedReceiver = Uri.encode(receiverName)
+            return "chat/$chatId?petName=$encodedPet&receiverName=$encodedReceiver"
+        }
+    }
+
+    // 10. Seguimiento Post-Adopción con fotos y reportes (RF11)
+    object FollowUp : Screen("followup/{petId}?petName={petName}&shelterName={shelterName}") {
+        fun createRoute(petId: String, petName: String = "", shelterName: String = "Refugio"): String {
+            val encodedPet = Uri.encode(petName)
+            val encodedShelter = Uri.encode(shelterName)
+            return "followup/$petId?petName=$encodedPet&shelterName=$encodedShelter"
+        }
+    }
 }

@@ -11,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -35,6 +36,7 @@ fun AdoptionFormScreen(
         return
     }
 
+    val context = LocalContext.current
     var reason by remember { mutableStateOf("") }
     var hasYard by remember { mutableStateOf(false) }
     var hasExperience by remember { mutableStateOf(false) }
@@ -208,6 +210,7 @@ fun AdoptionFormScreen(
                         hasYard = hasYard,
                         hasExperience = hasExperience,
                         termsAccepted = termsAccepted,
+                        context = context,
                         onSuccess = onRequestSubmitted
                     )
                 },

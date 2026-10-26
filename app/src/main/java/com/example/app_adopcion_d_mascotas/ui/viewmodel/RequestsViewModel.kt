@@ -1,5 +1,6 @@
 package com.example.app_adopcion_d_mascotas.ui.viewmodel
 
+import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -12,6 +13,7 @@ import com.example.app_adopcion_d_mascotas.data.model.RequestStatus
 import com.example.app_adopcion_d_mascotas.data.model.User
 import com.example.app_adopcion_d_mascotas.data.model.UserRole
 import com.example.app_adopcion_d_mascotas.data.repository.AppwriteRequestsRepository
+import com.example.app_adopcion_d_mascotas.notifications.NotificationHelper
 import kotlinx.coroutines.launch
 
 class RequestsViewModel : ViewModel() {
@@ -52,7 +54,7 @@ class RequestsViewModel : ViewModel() {
         }
     }
 
-    // RF8: Enviar solicitud de adopción
+    // RF8 & RF14: Enviar solicitud de adopción con notificación
     fun submitAdoptionRequest(
         petId: String,
         petName: String,
@@ -62,6 +64,7 @@ class RequestsViewModel : ViewModel() {
         hasYard: Boolean,
         hasExperience: Boolean,
         termsAccepted: Boolean,
+        context: Context? = null,
         onSuccess: () -> Unit
     ) {
         if (reason.isBlank()) {
@@ -94,6 +97,14 @@ class RequestsViewModel : ViewModel() {
 
             if (success) {
                 feedbackMessage = "¡Solicitud enviada con éxito!"
+                context?.let { ctx ->
+                    NotificationHelper.showNotification(
+                        context = ctx,
+                        notificationId = 1001,
+                        title = "🐾 Solicitud Enviada",
+                        message = "Tu solicitud para adoptar a $petName ha sido registrada con éxito."
+                    )
+                }
                 onSuccess()
             } else {
                 feedbackMessage = "Error al enviar la solicitud a la nube"
@@ -101,8 +112,8 @@ class RequestsViewModel : ViewModel() {
         }
     }
 
-    // RF10: Aceptar solicitud (marca adoptada y descarta las demás pendientes)
-    fun acceptRequest(request: AdoptionRequest, currentUser: User?, onSuccess: () -> Unit) {
+    // RF10 & RF14: Aceptar solicitud con notificación
+    fun acceptRequest(request: AdoptionRequest, currentUser: User?, context: Context? = null, onSuccess: () -> Unit) {
         viewModelScope.launch {
             isLoading = true
             val success = AppwriteRequestsRepository.acceptRequest(request.id, request.petId)
@@ -110,6 +121,14 @@ class RequestsViewModel : ViewModel() {
 
             if (success) {
                 feedbackMessage = "¡Solicitud aceptada! Mascota marcada como ADOPTADA automáticamente."
+                context?.let { ctx ->
+                    NotificationHelper.showNotification(
+                        context = ctx,
+                        notificationId = 1002,
+                        title = "🎉 ¡Adopción Confirmada!",
+                        message = "La adopción de ${request.petName} fue formalizada con éxito."
+                    )
+                }
                 loadRequests(currentUser)
                 onSuccess()
             } else {
@@ -133,7 +152,7 @@ class RequestsViewModel : ViewModel() {
         }
     }
 
-    // RF20: Coordinar Cita / Entrevista
+    // RF20 & RF14: Coordinar Cita / Entrevista y programar alarma con AlarmManager
     fun scheduleAppointment(
         requestId: String,
         petName: String,
@@ -143,6 +162,7 @@ class RequestsViewModel : ViewModel() {
         time: String,
         modality: String,
         currentUser: User?,
+        context: Context? = null,
         onSuccess: () -> Unit
     ) {
         if (date.isBlank() || time.isBlank()) {
@@ -168,6 +188,22 @@ class RequestsViewModel : ViewModel() {
 
             if (success) {
                 feedbackMessage = "Cita agendada con éxito"
+                context?.let { ctx ->
+                    NotificationHelper.showNotification(
+                        context = ctx,
+                        notificationId = 1003,
+                        title = "📅 Cita Agendada",
+                        message = "Cita con $shelterName para $petName agendada para el $date a las $time."
+                    )
+                    NotificationHelper.scheduleAppointmentAlarm(
+                        context = ctx,
+                        appointmentId = appointment.id.ifEmpty { System.currentTimeMillis().toString() },
+                        petName = petName,
+                        shelterName = shelterName,
+                        date = date,
+                        time = time
+                    )
+                }
                 loadAppointments(currentUser)
                 onSuccess()
             } else {

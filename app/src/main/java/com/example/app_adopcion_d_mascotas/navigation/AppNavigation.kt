@@ -11,8 +11,11 @@ import com.example.app_adopcion_d_mascotas.data.model.User
 import com.example.app_adopcion_d_mascotas.data.repository.AppwritePetRepository
 import com.example.app_adopcion_d_mascotas.ui.screens.appointments.AppointmentsScreen
 import com.example.app_adopcion_d_mascotas.ui.screens.auth.LoginScreen
+import com.example.app_adopcion_d_mascotas.ui.screens.chat.ChatScreen
 import com.example.app_adopcion_d_mascotas.ui.screens.detail.PetDetailScreen
 import com.example.app_adopcion_d_mascotas.ui.screens.feed.FeedScreen
+import com.example.app_adopcion_d_mascotas.ui.screens.followup.FollowUpScreen
+import com.example.app_adopcion_d_mascotas.ui.screens.profile.ProfileScreen
 import com.example.app_adopcion_d_mascotas.ui.screens.publish.CreateEditPetScreen
 import com.example.app_adopcion_d_mascotas.ui.screens.requests.AdoptionFormScreen
 import com.example.app_adopcion_d_mascotas.ui.screens.requests.RequestsScreen
@@ -69,6 +72,9 @@ fun AppNavigation() {
                 onAppointmentsClick = {
                     navController.navigate(Screen.Appointments.route)
                 },
+                onProfileClick = {
+                    navController.navigate(Screen.Profile.route)
+                },
                 onLogoutClick = {
                     currentUser = null
                     navController.navigate(Screen.Login.route) {
@@ -78,7 +84,7 @@ fun AppNavigation() {
             )
         }
 
-        // RUTA 3: Detalle de Mascota con carrusel de fotos (RF4) y acción de adopción (RF8)
+        // RUTA 3: Detalle de Mascota con carrusel de fotos (RF4), mapa (RF7), chat (RF13) y seguimiento (RF11)
         composable(
             route = Screen.Detail.route,
             arguments = listOf(
@@ -111,6 +117,24 @@ fun AppNavigation() {
                 },
                 onAdoptClick = { id ->
                     navController.navigate(Screen.AdoptionForm.createRoute(id))
+                },
+                onChatClick = { chatId, petName ->
+                    navController.navigate(
+                        Screen.Chat.createRoute(
+                            chatId = chatId,
+                            petName = petName,
+                            receiverName = pet?.shelterName ?: "Refugio"
+                        )
+                    )
+                },
+                onFollowUpClick = { id ->
+                    navController.navigate(
+                        Screen.FollowUp.createRoute(
+                            petId = id,
+                            petName = pet?.name ?: "",
+                            shelterName = pet?.shelterName ?: "Refugio"
+                        )
+                    )
                 }
             )
         }
@@ -180,6 +204,86 @@ fun AppNavigation() {
             AppointmentsScreen(
                 currentUser = currentUser,
                 requestsViewModel = requestsViewModel,
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        // RUTA 8: Perfil de Usuario con foto de avatar y gestión (RF2)
+        composable(Screen.Profile.route) {
+            ProfileScreen(
+                currentUser = currentUser,
+                onUserUpdated = { updated ->
+                    currentUser = updated
+                },
+                onBackClick = { navController.popBackStack() },
+                onLogoutClick = {
+                    currentUser = null
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                },
+                onPetClick = { petId ->
+                    navController.navigate(Screen.Detail.createRoute(petId))
+                },
+                onChatClick = { chatId, receiverName ->
+                    navController.navigate(
+                        Screen.Chat.createRoute(
+                            chatId = chatId,
+                            receiverName = receiverName
+                        )
+                    )
+                }
+            )
+        }
+
+        // RUTA 9: Chat en Tiempo Real Adoptante - Refugio (RF13)
+        composable(
+            route = Screen.Chat.route,
+            arguments = listOf(
+                navArgument("chatId") { type = NavType.StringType },
+                navArgument("petName") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument("receiverName") {
+                    type = NavType.StringType
+                    defaultValue = "Refugio"
+                }
+            )
+        ) { backStackEntry ->
+            val chatId = backStackEntry.arguments?.getString("chatId") ?: ""
+            val petName = backStackEntry.arguments?.getString("petName") ?: ""
+            val receiverName = backStackEntry.arguments?.getString("receiverName") ?: "Refugio"
+
+            ChatScreen(
+                chatId = chatId,
+                petName = petName,
+                receiverName = receiverName,
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        // RUTA 10: Formulario y Línea de Tiempo de Seguimiento Post-Adopción (RF11)
+        composable(
+            route = Screen.FollowUp.route,
+            arguments = listOf(
+                navArgument("petId") { type = NavType.StringType },
+                navArgument("petName") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument("shelterName") {
+                    type = NavType.StringType
+                    defaultValue = "Refugio"
+                }
+            )
+        ) { backStackEntry ->
+            val petId = backStackEntry.arguments?.getString("petId") ?: ""
+            val pet = feedViewModel.allPets.find { it.id == petId }
+
+            FollowUpScreen(
+                pet = pet,
+                currentUser = currentUser,
                 onBackClick = { navController.popBackStack() }
             )
         }

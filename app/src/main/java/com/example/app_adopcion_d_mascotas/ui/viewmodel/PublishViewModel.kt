@@ -54,6 +54,10 @@ class PublishViewModel : ViewModel() {
             statusMessage = "Por favor completa el nombre, raza y descripción"
             return
         }
+        if (ageYears < 1 || ageYears > 25) {
+            statusMessage = "La edad debe estar entre 1 y 25 años"
+            return
+        }
 
         viewModelScope.launch {
             isSaving = true

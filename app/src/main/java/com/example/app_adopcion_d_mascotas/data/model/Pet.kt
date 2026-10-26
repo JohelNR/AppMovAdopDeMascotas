@@ -21,7 +21,9 @@ data class Pet(
     val gender: String = "Macho",       // RF6: Macho o Hembra
     val size: String = "Mediano",       // RF6: Pequeño, Mediano o Grande
     val location: String = "Lima",      // RF6: Ciudad o distrito
-    val photos: List<String> = emptyList() // RF3: IDs de fotos en Appwrite Storage
+    val photos: List<String> = emptyList(), // RF3: IDs de fotos en Appwrite Storage
+    val latitude: Double = -12.0464,    // RF7: Coordenadas de ubicación del refugio
+    val longitude: Double = -77.0428
 ) {
     // Retorna la URL de la foto principal (de Appwrite Storage o fallback)
     val displayPhoto: String
@@ -30,7 +32,14 @@ data class Pet(
         } else if (imageUrl.isNotBlank()) {
             imageUrl
         } else {
-            "https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=500"
+            when {
+                name.contains("Luna", ignoreCase = true) -> "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=600"
+                name.contains("Mimi", ignoreCase = true) -> "https://images.unsplash.com/photo-1573865526739-10659fec78a5?w=600"
+                name.contains("Rocky", ignoreCase = true) -> "https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?w=600"
+                name.contains("Max", ignoreCase = true) -> "https://images.unsplash.com/photo-1552053831-71594a27632d?w=600"
+                species.equals("Gato", ignoreCase = true) -> "https://images.unsplash.com/photo-1533738363-b7f9aef128ce?w=600"
+                else -> "https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=600"
+            }
         }
 
     // Retorna todas las URLs de las fotos para el carrusel
