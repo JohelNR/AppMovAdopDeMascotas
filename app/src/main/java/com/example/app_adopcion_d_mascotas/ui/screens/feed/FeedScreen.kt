@@ -59,9 +59,9 @@ fun FeedScreen(
                                 fontWeight = FontWeight.Bold
                             )
                         }
-                        currentUser?.let { user ->
+                        currentUser?.let { usuario ->
                             Text(
-                                text = "Hola, ${user.name} (${if (user.role == UserRole.REFUGIO) "Refugio" else "Adoptante"})",
+                                text = "Hola, ${usuario.name} (${if (usuario.role == UserRole.REFUGIO) "Refugio" else "Adoptante"})",
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -127,15 +127,15 @@ fun FeedScreen(
         ) {
             // RF6: Barra de Búsqueda
             OutlinedTextField(
-                value = feedViewModel.searchQuery,
-                onValueChange = { feedViewModel.searchQuery = it },
+                value = feedViewModel.textoBusqueda,
+                onValueChange = { feedViewModel.textoBusqueda = it },
                 placeholder = { Text("Buscar por nombre, raza o refugio...") },
                 leadingIcon = {
                     Icon(imageVector = Icons.Default.Search, contentDescription = "Buscar")
                 },
                 trailingIcon = {
-                    if (feedViewModel.searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { feedViewModel.searchQuery = "" }) {
+                    if (feedViewModel.textoBusqueda.isNotEmpty()) {
+                        IconButton(onClick = { feedViewModel.textoBusqueda = "" }) {
                             Icon(imageVector = Icons.Default.Clear, contentDescription = "Limpiar")
                         }
                     }
@@ -156,33 +156,33 @@ fun FeedScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Filtro Especie
-                listOf("Todos", "Perro", "Gato").forEach { species ->
+                listOf("Todos", "Perro", "Gato").forEach { especie ->
                     FilterChip(
-                        selected = feedViewModel.selectedSpecies == species,
-                        onClick = { feedViewModel.selectedSpecies = species },
-                        label = { Text(if (species == "Todos") "🐾 Especie" else species) }
+                        selected = feedViewModel.especieSeleccionada == especie,
+                        onClick = { feedViewModel.especieSeleccionada = especie },
+                        label = { Text(if (especie == "Todos") "🐾 Especie" else especie) }
                     )
                 }
 
                 // Filtro Sexo
-                listOf("Macho", "Hembra").forEach { gender ->
+                listOf("Macho", "Hembra").forEach { sexo ->
                     FilterChip(
-                        selected = feedViewModel.selectedGender == gender,
+                        selected = feedViewModel.sexoSeleccionado == sexo,
                         onClick = {
-                            feedViewModel.selectedGender = if (feedViewModel.selectedGender == gender) "Todos" else gender
+                            feedViewModel.sexoSeleccionado = if (feedViewModel.sexoSeleccionado == sexo) "Todos" else sexo
                         },
-                        label = { Text(gender) }
+                        label = { Text(sexo) }
                     )
                 }
 
                 // Filtro Tamaño
-                listOf("Pequeño", "Mediano", "Grande").forEach { size ->
+                listOf("Pequeño", "Mediano", "Grande").forEach { tamano ->
                     FilterChip(
-                        selected = feedViewModel.selectedSize == size,
+                        selected = feedViewModel.tamanoSeleccionado == tamano,
                         onClick = {
-                            feedViewModel.selectedSize = if (feedViewModel.selectedSize == size) "Todos" else size
+                            feedViewModel.tamanoSeleccionado = if (feedViewModel.tamanoSeleccionado == tamano) "Todos" else tamano
                         },
-                        label = { Text(size) }
+                        label = { Text(tamano) }
                     )
                 }
             }
@@ -196,26 +196,26 @@ fun FeedScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "${feedViewModel.resultCount} mascotas encontradas",
+                    text = "${feedViewModel.cantidadResultados} mascotas encontradas",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                if (feedViewModel.searchQuery.isNotEmpty() || feedViewModel.selectedSpecies != "Todos" ||
-                    feedViewModel.selectedGender != "Todos" || feedViewModel.selectedSize != "Todos"
+                if (feedViewModel.textoBusqueda.isNotEmpty() || feedViewModel.especieSeleccionada != "Todos" ||
+                    feedViewModel.sexoSeleccionado != "Todos" || feedViewModel.tamanoSeleccionado != "Todos"
                 ) {
-                    TextButton(onClick = { feedViewModel.resetFilters() }) {
+                    TextButton(onClick = { feedViewModel.limpiarFiltros() }) {
                         Text("Limpiar filtros", fontSize = 12.sp)
                     }
                 }
             }
 
-            if (feedViewModel.isLoading) {
+            if (feedViewModel.estaCargando) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
-            } else if (feedViewModel.filteredPets.isEmpty()) {
+            } else if (feedViewModel.mascotasFiltradas.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -249,7 +249,7 @@ fun FeedScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     // RF5: Sección destacada de Mascotas Urgentes
-                    if (feedViewModel.urgentPets.isNotEmpty() && feedViewModel.searchQuery.isEmpty()) {
+                    if (feedViewModel.mascotasUrgentes.isNotEmpty() && feedViewModel.textoBusqueda.isEmpty()) {
                         item {
                             Text(
                                 text = "🚨 Casos Urgentes",
@@ -261,10 +261,10 @@ fun FeedScreen(
                             LazyRow(
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                items(feedViewModel.urgentPets) { urgentPet ->
+                                items(feedViewModel.mascotasUrgentes) { mascotaUrgente ->
                                     PetCard(
-                                        pet = urgentPet,
-                                        onClick = { onPetClick(urgentPet.id) },
+                                        pet = mascotaUrgente,
+                                        onClick = { onPetClick(mascotaUrgente.id) },
                                         modifier = Modifier.width(280.dp)
                                     )
                                 }
@@ -279,10 +279,10 @@ fun FeedScreen(
                     }
 
                     // Lista general de mascotas filtradas
-                    items(feedViewModel.filteredPets, key = { it.id }) { pet ->
+                    items(feedViewModel.mascotasFiltradas, key = { it.id }) { mascota ->
                         PetCard(
-                            pet = pet,
-                            onClick = { onPetClick(pet.id) }
+                            pet = mascota,
+                            onClick = { onPetClick(mascota.id) }
                         )
                     }
                 }

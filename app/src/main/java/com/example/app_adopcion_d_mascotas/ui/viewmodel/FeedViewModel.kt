@@ -24,6 +24,38 @@ class FeedViewModel : ViewModel() {
     var selectedSize by mutableStateOf("Todos")
     var selectedGender by mutableStateOf("Todos")
 
+    // Propiedades y alias en español para que puedas leerlas y explicarlas fácilmente
+    var textoBusqueda: String
+        get() = searchQuery
+        set(value) { searchQuery = value }
+
+    var especieSeleccionada: String
+        get() = selectedSpecies
+        set(value) { selectedSpecies = value }
+
+    var tamanoSeleccionado: String
+        get() = selectedSize
+        set(value) { selectedSize = value }
+
+    var sexoSeleccionado: String
+        get() = selectedGender
+        set(value) { selectedGender = value }
+
+    val mascotasFiltradas: List<Pet>
+        get() = filteredPets
+
+    val mascotasUrgentes: List<Pet>
+        get() = urgentPets
+
+    val cantidadResultados: Int
+        get() = resultCount
+
+    val estaCargando: Boolean
+        get() = isLoading
+
+    fun cargarMascotas() = loadPets()
+    fun limpiarFiltros() = resetFilters()
+
     init {
         loadPets()
     }

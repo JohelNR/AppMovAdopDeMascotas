@@ -28,15 +28,15 @@ fun LoginScreen(
     authViewModel: AuthViewModel = viewModel(),
     onLoginSuccess: (User) -> Unit
 ) {
-    var name by remember { mutableStateOf("") }
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var selectedRole by remember { mutableStateOf(UserRole.ADOPTANTE) }
-    var isRegisterMode by remember { mutableStateOf(false) }
-    var showRecoverDialog by remember { mutableStateOf(false) }
-    var recoverEmail by remember { mutableStateOf("") }
-    var recoverMessage by remember { mutableStateOf<String?>(null) }
-
+    // Variables de estado en español para que sean fáciles de leer y explicar
+    var nombre by remember { mutableStateOf("") }
+    var correo by remember { mutableStateOf("") }
+    var contrasena by remember { mutableStateOf("") }
+    var rolSeleccionado by remember { mutableStateOf(UserRole.ADOPTANTE) }
+    var modoRegistro by remember { mutableStateOf(false) }
+    var mostrarDialogoRecuperar by remember { mutableStateOf(false) }
+    var correoRecuperacion by remember { mutableStateOf("") }
+    var mensajeRecuperacion by remember { mutableStateOf<String?>(null) }
 
     Column(
         modifier = Modifier
@@ -46,7 +46,7 @@ fun LoginScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Logo oficial
+        // Logo de la aplicación
         Surface(
             shape = CircleShape,
             color = MaterialTheme.colorScheme.primaryContainer,
@@ -55,7 +55,7 @@ fun LoginScreen(
             Box(contentAlignment = Alignment.Center) {
                 Icon(
                     imageVector = Icons.Default.Pets,
-                    contentDescription = "Logo",
+                    contentDescription = "Logo Huellitas",
                     modifier = Modifier.size(48.dp),
                     tint = MaterialTheme.colorScheme.primary
                 )
@@ -72,18 +72,18 @@ fun LoginScreen(
         )
 
         Text(
-            text = if (isRegisterMode) "Crea tu cuenta en la nube" else "Inicia sesión para continuar",
+            text = if (modoRegistro) "Crea tu cuenta en la nube" else "Inicia sesión para continuar",
             fontSize = 14.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Si es registro, pedimos el nombre
-        if (isRegisterMode) {
+        // Si estamos en modo registro, pedimos el nombre
+        if (modoRegistro) {
             OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
+                value = nombre,
+                onValueChange = { nombre = it },
                 label = { Text("Nombre o Nombre del Refugio") },
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
@@ -92,10 +92,10 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(12.dp))
         }
 
-        // Campo Correo
+        // Campo de Correo Electrónico
         OutlinedTextField(
-            value = email,
-            onValueChange = { email = it },
+            value = correo,
+            onValueChange = { correo = it },
             label = { Text("Correo electrónico") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
             singleLine = true,
@@ -105,10 +105,10 @@ fun LoginScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Campo Contraseña
+        // Campo de Contraseña
         OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
+            value = contrasena,
+            onValueChange = { contrasena = it },
             label = { Text("Contraseña (mínimo 8 caracteres)") },
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -119,8 +119,8 @@ fun LoginScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Selector de Rol (RF1) si está en modo registro
-        if (isRegisterMode) {
+        // Selector de Rol si estamos registrando
+        if (modoRegistro) {
             Text(
                 text = "¿Cuál es tu rol?",
                 fontWeight = FontWeight.SemiBold,
@@ -135,15 +135,15 @@ fun LoginScreen(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 FilterChip(
-                    selected = selectedRole == UserRole.ADOPTANTE,
-                    onClick = { selectedRole = UserRole.ADOPTANTE },
+                    selected = rolSeleccionado == UserRole.ADOPTANTE,
+                    onClick = { rolSeleccionado = UserRole.ADOPTANTE },
                     label = { Text("🏠 Soy Adoptante") },
                     modifier = Modifier.weight(1f)
                 )
 
                 FilterChip(
-                    selected = selectedRole == UserRole.REFUGIO,
-                    onClick = { selectedRole = UserRole.REFUGIO },
+                    selected = rolSeleccionado == UserRole.REFUGIO,
+                    onClick = { rolSeleccionado = UserRole.REFUGIO },
                     label = { Text("🐾 Soy Refugio") },
                     modifier = Modifier.weight(1f)
                 )
@@ -151,15 +151,15 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(16.dp))
         }
 
-        // Mensaje de error si falla
-        authViewModel.errorMessage?.let { errorMsg ->
+        // Mensaje de error si la autenticación falla
+        authViewModel.errorMessage?.let { mensajeError ->
             Surface(
                 color = MaterialTheme.colorScheme.errorContainer,
                 shape = RoundedCornerShape(8.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = errorMsg,
+                    text = mensajeError,
                     color = MaterialTheme.colorScheme.error,
                     fontSize = 13.sp,
                     modifier = Modifier.padding(12.dp)
@@ -168,13 +168,13 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(12.dp))
         }
 
-        // Botón Principal
+        // Botón Principal (Entrar o Crear Cuenta)
         Button(
             onClick = {
-                if (isRegisterMode) {
-                    authViewModel.register(name, email, password, selectedRole, onLoginSuccess)
+                if (modoRegistro) {
+                    authViewModel.register(nombre, correo, contrasena, rolSeleccionado, onLoginSuccess)
                 } else {
-                    authViewModel.login(email, password, onLoginSuccess)
+                    authViewModel.login(correo, contrasena, onLoginSuccess)
                 }
             },
             enabled = !authViewModel.isLoading,
@@ -190,7 +190,7 @@ fun LoginScreen(
                 )
             } else {
                 Text(
-                    text = if (isRegisterMode) "Crear Cuenta" else "Entrar",
+                    text = if (modoRegistro) "Crear Cuenta" else "Entrar",
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp
                 )
@@ -202,18 +202,18 @@ fun LoginScreen(
         // Alternar entre login y registro
         TextButton(
             onClick = {
-                isRegisterMode = !isRegisterMode
+                modoRegistro = !modoRegistro
             }
         ) {
             Text(
-                text = if (isRegisterMode) "¿Ya tienes cuenta? Inicia sesión" else "¿No tienes cuenta? Regístrate aquí"
+                text = if (modoRegistro) "¿Ya tienes cuenta? Inicia sesión" else "¿No tienes cuenta? Regístrate aquí"
             )
         }
 
-        // Recuperar contraseña (solicitado por el profesor en evaluación)
-        if (!isRegisterMode) {
+        // Recuperar contraseña
+        if (!modoRegistro) {
             TextButton(
-                onClick = { showRecoverDialog = true }
+                onClick = { mostrarDialogoRecuperar = true }
             ) {
                 Text(
                     text = "¿Olvidaste tu contraseña? Recupérala aquí",
@@ -225,7 +225,7 @@ fun LoginScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // RF1: Botón de Inicio de Sesión Oficial con Google
+        // Inicio de sesión con Google
         OutlinedButton(
             onClick = { authViewModel.loginWithGoogle(onLoginSuccess) },
             shape = RoundedCornerShape(12.dp),
@@ -288,12 +288,12 @@ fun LoginScreen(
         }
     }
 
-    // Diálogo de Recuperación de Contraseña
-    if (showRecoverDialog) {
+    // Ventana emergente para Recuperar Contraseña
+    if (mostrarDialogoRecuperar) {
         AlertDialog(
             onDismissRequest = {
-                showRecoverDialog = false
-                recoverMessage = null
+                mostrarDialogoRecuperar = false
+                mensajeRecuperacion = null
             },
             title = {
                 Text("Recuperar Contraseña", fontWeight = FontWeight.Bold)
@@ -306,16 +306,16 @@ fun LoginScreen(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     OutlinedTextField(
-                        value = recoverEmail,
-                        onValueChange = { recoverEmail = it },
+                        value = correoRecuperacion,
+                        onValueChange = { correoRecuperacion = it },
                         label = { Text("Correo electrónico") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
-                    recoverMessage?.let { msg ->
+                    mensajeRecuperacion?.let { mensaje ->
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = msg,
+                            text = mensaje,
                             color = MaterialTheme.colorScheme.primary,
                             style = MaterialTheme.typography.bodySmall
                         )
@@ -325,8 +325,8 @@ fun LoginScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        if (recoverEmail.isNotBlank()) {
-                            recoverMessage = "¡Enlace de recuperación enviado con éxito a $recoverEmail!"
+                        if (correoRecuperacion.isNotBlank()) {
+                            mensajeRecuperacion = "¡Enlace de recuperación enviado con éxito a $correoRecuperacion!"
                         }
                     }
                 ) {
@@ -334,7 +334,7 @@ fun LoginScreen(
                 }
             },
             dismissButton = {
-                OutlinedButton(onClick = { showRecoverDialog = false }) {
+                OutlinedButton(onClick = { mostrarDialogoRecuperar = false }) {
                     Text("Cerrar")
                 }
             }

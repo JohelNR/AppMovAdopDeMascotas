@@ -29,6 +29,25 @@ class RequestsViewModel : ViewModel() {
 
     var feedbackMessage by mutableStateOf<String?>(null)
 
+    // Alias en español para que puedas leerlos y explicarlos con total fluidez
+    val listaSolicitudes: List<AdoptionRequest>
+        get() = requestsList
+
+    val listaCitas: List<Appointment>
+        get() = appointmentsList
+
+    val estaCargando: Boolean
+        get() = isLoading
+
+    var mensajeRespuesta: String?
+        get() = feedbackMessage
+        set(value) { feedbackMessage = value }
+
+    fun cargarSolicitudes(usuarioActual: User?) = loadRequests(usuarioActual)
+    fun cargarCitas(usuarioActual: User?) = loadAppointments(usuarioActual)
+    fun rechazarSolicitud(idSolicitud: String, usuarioActual: User?) = rejectRequest(idSolicitud, usuarioActual)
+    fun confirmarCita(idCita: String, usuarioActual: User?) = confirmAppointment(idCita, usuarioActual)
+
     // Cargar solicitudes según el rol del usuario actual
     fun loadRequests(currentUser: User?) {
         if (currentUser == null) return

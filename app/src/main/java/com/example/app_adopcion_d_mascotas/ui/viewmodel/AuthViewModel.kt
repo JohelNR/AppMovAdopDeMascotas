@@ -21,6 +21,16 @@ class AuthViewModel : ViewModel() {
     var errorMessage by mutableStateOf<String?>(null)
         private set
 
+    // Alias y propiedades en español para lectura directa
+    val usuarioActual: User?
+        get() = currentUser
+
+    val estaCargando: Boolean
+        get() = isLoading
+
+    val mensajeError: String?
+        get() = errorMessage
+
     init {
         checkSession()
     }
@@ -136,4 +146,17 @@ class AuthViewModel : ViewModel() {
             onLoggedOut()
         }
     }
+
+    // Nombres en español
+    fun iniciarSesion(correo: String, contrasena: String, alTenerExito: (User) -> Unit) =
+        login(correo, contrasena, alTenerExito)
+
+    fun registrarse(nombre: String, correo: String, contrasena: String, rol: UserRole, alTenerExito: (User) -> Unit) =
+        register(nombre, correo, contrasena, rol, alTenerExito)
+
+    fun iniciarSesionConGoogle(alTenerExito: (User) -> Unit) =
+        loginWithGoogle(alTenerExito)
+
+    fun cerrarSesion(alCerrar: () -> Unit) =
+        logout(alCerrar)
 }
