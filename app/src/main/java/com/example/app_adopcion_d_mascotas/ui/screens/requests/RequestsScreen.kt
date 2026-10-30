@@ -41,28 +41,28 @@ fun RequestsScreen(
 ) {
     // Al abrir la pantalla, cargar las solicitudes del usuario actual
     LaunchedEffect(currentUser) {
-        requestsViewModel.loadRequests(currentUser)
+        requestsViewModel.cargarSolicitudes(currentUser)
     }
 
-    val requests = requestsViewModel.requestsList
-    val isLoading = requestsViewModel.isLoading
-    val snackbarHostState = remember { SnackbarHostState() }
-    val context = LocalContext.current
+    val solicitudes = requestsViewModel.listaSolicitudes
+    val estaCargando = requestsViewModel.estaCargando
+    val estadoSnackbar = remember { SnackbarHostState() }
+    val contexto = LocalContext.current
 
     // Mostrar feedback si existe
-    LaunchedEffect(requestsViewModel.feedbackMessage) {
-        requestsViewModel.feedbackMessage?.let { msg ->
-            snackbarHostState.showSnackbar(msg)
-            requestsViewModel.feedbackMessage = null
+    LaunchedEffect(requestsViewModel.mensajeRespuesta) {
+        requestsViewModel.mensajeRespuesta?.let { mensaje ->
+            estadoSnackbar.showSnackbar(mensaje)
+            requestsViewModel.mensajeRespuesta = null
         }
     }
 
     // Estados para diálogos
-    var requestToAccept by remember { mutableStateOf<AdoptionRequest?>(null) }
-    var requestToSchedule by remember { mutableStateOf<AdoptionRequest?>(null) }
+    var solicitudPorAceptar by remember { mutableStateOf<AdoptionRequest?>(null) }
+    var solicitudPorAgendar by remember { mutableStateOf<AdoptionRequest?>(null) }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { SnackbarHost(estadoSnackbar) },
         topBar = {
             TopAppBar(
                 title = {
@@ -101,9 +101,9 @@ fun RequestsScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            if (isLoading) {
+            if (estaCargando) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-            } else if (requests.isEmpty()) {
+            } else if (solicitudes.isEmpty()) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -144,15 +144,15 @@ fun RequestsScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    items(requests, key = { it.id }) { request ->
-                        RequestCard(
-                            request = request,
+                    items(solicitudes, key = { it.id }) { solicitud ->
+                        TarjetaSolicitud(
+                            request = solicitud,
                             currentUser = currentUser,
-                            onAcceptClick = { requestToAccept = request },
+                            onAcceptClick = { solicitudPorAceptar = solicitud },
                             onRejectClick = {
-                                requestsViewModel.rejectRequest(request.id, currentUser)
+                                requestsViewModel.rechazarSolicitud(solicitud.id, currentUser)
                             },
-                            onScheduleClick = { requestToSchedule = request }
+                            onScheduleClick = { solicitudPorAgendar = solicitud }
                         )
                     }
                 }
@@ -161,9 +161,9 @@ fun RequestsScreen(
     }
 
     // DIÁLOGO RF10: Confirmación de Aceptación y Cascada Automática
-    requestToAccept?.let { req ->
+    solicitudPorAceptar?.let { req ->
         AlertDialog(
-            onDismissRequest = { requestToAccept = null },
+            onDismissRequest = { solicitudPorAceptar = null },
             icon = {
                 Icon(
                     imageVector = Icons.Default.Check,
@@ -203,8 +203,8 @@ fun RequestsScreen(
                 Button(
                     onClick = {
                         val toAccept = req
-                        requestToAccept = null
-                        requestsViewModel.acceptRequest(toAccept, currentUser, context = context) {
+                        solicitudPorAceptar = null
+                        requestsViewModel.acceptRequest(toAccept, currentUser, context = contexto) {
                             feedViewModel.loadPets()
                         }
                     },
@@ -214,7 +214,7 @@ fun RequestsScreen(
                 }
             },
             dismissButton = {
-                OutlinedButton(onClick = { requestToAccept = null }) {
+                OutlinedButton(onClick = { solicitudPorAceptar = null }) {
                     Text("Cancelar")
                 }
             }
@@ -222,23 +222,23 @@ fun RequestsScreen(
     }
 
     // DIÁLOGO RF20: Agendar Cita o Entrevista
-    requestToSchedule?.let { req ->
-        ScheduleAppointmentDialog(
+    solicitudPorAgendar?.let { req ->
+        DialogoAgendarCita(
             request = req,
-            onDismiss = { requestToSchedule = null },
-            onConfirm = { date, time, modality ->
+            onDismiss = { solicitudPorAgendar = null },
+            onConfirm = { fecha, hora, modalidad ->
                 requestsViewModel.scheduleAppointment(
                     requestId = req.id,
                     petName = req.petName,
                     applicantName = req.applicantName,
                     shelterName = req.shelterName.ifBlank { currentUser?.name ?: "Refugio" },
-                    date = date,
-                    time = time,
-                    modality = modality,
+                    date = fecha,
+                    time = hora,
+                    modality = modalidad,
                     currentUser = currentUser,
-                    context = context,
+                    context = contexto,
                     onSuccess = {
-                        requestToSchedule = null
+                        solicitudPorAgendar = null
                         onGoToAppointments()
                     }
                 )
@@ -248,14 +248,14 @@ fun RequestsScreen(
 }
 
 @Composable
-fun RequestCard(
+fun TarjetaSolicitud(
     request: AdoptionRequest,
     currentUser: User?,
     onAcceptClick: () -> Unit,
     onRejectClick: () -> Unit,
     onScheduleClick: () -> Unit
 ) {
-    val isShelter = currentUser?.role == UserRole.REFUGIO
+    val esRefugio = currentUser?.role == UserRole.REFUGIO
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -329,7 +329,7 @@ fun RequestCard(
                     }
                 }
 
-                if (!isShelter && request.shelterName.isNotBlank()) {
+                if (!esRefugio && request.shelterName.isNotBlank()) {
                     Text(
                         text = "Refugio a cargo: ${request.shelterName}",
                         fontSize = 13.sp,
@@ -367,19 +367,19 @@ fun RequestCard(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    QuestionnaireCheck(
-                        label = "Patio / Jardín",
-                        value = request.hasYard
+                    VerificacionCuestionario(
+                        etiqueta = "Patio / Jardín",
+                        valor = request.hasYard
                     )
-                    QuestionnaireCheck(
-                        label = "Experiencia previa",
-                        value = request.hasExperience
+                    VerificacionCuestionario(
+                        etiqueta = "Experiencia previa",
+                        valor = request.hasExperience
                     )
                 }
             }
 
             // Mensajes contextuales según estado para el adoptante
-            if (!isShelter) {
+            if (!esRefugio) {
                 when (request.status) {
                     RequestStatus.ACEPTADA -> {
                         Surface(
@@ -432,7 +432,7 @@ fun RequestCard(
             }
 
             // Botones de acción del Refugio (RF9, RF10, RF20)
-            if (isShelter && request.status == RequestStatus.PENDIENTE) {
+            if (esRefugio && request.status == RequestStatus.PENDIENTE) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -491,17 +491,17 @@ fun RequestCard(
 }
 
 @Composable
-fun QuestionnaireCheck(label: String, value: Boolean) {
+fun VerificacionCuestionario(etiqueta: String, valor: Boolean) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(
-            imageVector = if (value) Icons.Default.Check else Icons.Default.Close,
+            imageVector = if (valor) Icons.Default.Check else Icons.Default.Close,
             contentDescription = null,
-            tint = if (value) Color(0xFF2E7D32) else Color.Gray,
+            tint = if (valor) Color(0xFF2E7D32) else Color.Gray,
             modifier = Modifier.size(14.dp)
         )
         Spacer(modifier = Modifier.width(4.dp))
         Text(
-            text = "$label: ${if (value) "Sí" else "No"}",
+            text = "$etiqueta: ${if (valor) "Sí" else "No"}",
             fontSize = 11.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -510,7 +510,7 @@ fun QuestionnaireCheck(label: String, value: Boolean) {
 
 @Composable
 fun StatusChip(status: RequestStatus) {
-    val (bgColor, textColor, label) = when (status) {
+    val (colorFondo, colorTexto, textoEtiqueta) = when (status) {
         RequestStatus.PENDIENTE -> Triple(Color(0xFFFFF3E0), Color(0xFFE65100), "Pendiente")
         RequestStatus.ACEPTADA -> Triple(Color(0xFFE8F5E9), Color(0xFF2E7D32), "Aceptada")
         RequestStatus.RECHAZADA -> Triple(Color(0xFFFFEBEE), Color(0xFFC62828), "Rechazada")
@@ -518,12 +518,12 @@ fun StatusChip(status: RequestStatus) {
     }
 
     Surface(
-        color = bgColor,
+        color = colorFondo,
         shape = RoundedCornerShape(12.dp)
     ) {
         Text(
-            text = label,
-            color = textColor,
+            text = textoEtiqueta,
+            color = colorTexto,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
@@ -532,14 +532,14 @@ fun StatusChip(status: RequestStatus) {
 }
 
 @Composable
-fun ScheduleAppointmentDialog(
+fun DialogoAgendarCita(
     request: AdoptionRequest,
     onDismiss: () -> Unit,
-    onConfirm: (date: String, time: String, modality: String) -> Unit
+    onConfirm: (fecha: String, hora: String, modalidad: String) -> Unit
 ) {
-    var date by remember { mutableStateOf("20/10/2026") }
-    var time by remember { mutableStateOf("15:00") }
-    var modality by remember { mutableStateOf("Presencial") }
+    var fecha by remember { mutableStateOf("20/10/2026") }
+    var hora by remember { mutableStateOf("15:00") }
+    var modalidad by remember { mutableStateOf("Presencial") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -553,16 +553,16 @@ fun ScheduleAppointmentDialog(
                 )
 
                 OutlinedTextField(
-                    value = date,
-                    onValueChange = { date = it },
+                    value = fecha,
+                    onValueChange = { fecha = it },
                     label = { Text("Fecha (DD/MM/AAAA)") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 OutlinedTextField(
-                    value = time,
-                    onValueChange = { time = it },
+                    value = hora,
+                    onValueChange = { hora = it },
                     label = { Text("Hora (HH:MM)") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
@@ -571,13 +571,13 @@ fun ScheduleAppointmentDialog(
                 Text("Modalidad:", fontSize = 13.sp, fontWeight = FontWeight.Medium)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(
-                        selected = modality == "Presencial",
-                        onClick = { modality = "Presencial" },
+                        selected = modalidad == "Presencial",
+                        onClick = { modalidad = "Presencial" },
                         label = { Text("Presencial") }
                     )
                     FilterChip(
-                        selected = modality == "Virtual",
-                        onClick = { modality = "Virtual" },
+                        selected = modalidad == "Virtual",
+                        onClick = { modalidad = "Virtual" },
                         label = { Text("Virtual (Meet)") }
                     )
                 }
@@ -585,8 +585,8 @@ fun ScheduleAppointmentDialog(
         },
         confirmButton = {
             Button(
-                onClick = { onConfirm(date, time, modality) },
-                enabled = date.isNotBlank() && time.isNotBlank()
+                onClick = { onConfirm(fecha, hora, modalidad) },
+                enabled = fecha.isNotBlank() && hora.isNotBlank()
             ) {
                 Text("Confirmar Cita")
             }

@@ -57,8 +57,8 @@ fun PetDetailScreen(
     onChatClick: (String, String) -> Unit = { _, _ -> },
     onFollowUpClick: (String) -> Unit = {}
 ) {
-    val context = LocalContext.current
-    var showDeleteDialog by remember { mutableStateOf(false) }
+    val contexto = LocalContext.current
+    var mostrarDialogoEliminar by remember { mutableStateOf(false) }
 
     if (pet == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -67,9 +67,9 @@ fun PetDetailScreen(
         return
     }
 
-    val petLocation = remember(pet) { LatLng(pet.latitude, pet.longitude) }
-    val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(petLocation, 14f)
+    val ubicacionMascota = remember(pet) { LatLng(pet.latitude, pet.longitude) }
+    val estadoCamara = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(ubicacionMascota, 14f)
     }
 
     Scaffold(
@@ -94,31 +94,36 @@ fun PetDetailScreen(
                 .verticalScroll(rememberScrollState())
         ) {
             // CARRUSEL DE FOTOS (RF3 y RF4)
-            val allPhotos = pet.getAllPhotoUrls()
-            if (allPhotos.size > 1) {
+            val todasLasFotos = pet.getAllPhotoUrls()
+            if (todasLasFotos.size > 1) {
                 LazyRow(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(280.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                    contentPadding = PaddingValues(horizontal = 16.dp)
                 ) {
-                    items(allPhotos) { photoUrl ->
-                        AsyncImage(
-                            model = photoUrl,
-                            contentDescription = "Foto de ${pet.name}",
-                            contentScale = ContentScale.Crop,
+                    items(todasLasFotos) { urlFoto ->
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
                             modifier = Modifier
-                                .width(280.dp)
+                                .fillParentMaxWidth(0.9f)
                                 .fillMaxHeight()
-                                .clip(RoundedCornerShape(16.dp))
-                        )
+                        ) {
+                            AsyncImage(
+                                model = urlFoto,
+                                contentDescription = pet.name,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
                     }
                 }
             } else {
+                // Foto única
                 AsyncImage(
-                    model = pet.displayPhoto,
-                    contentDescription = "Foto de ${pet.name}",
+                    model = pet.imageUrl,
+                    contentDescription = pet.name,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -126,44 +131,47 @@ fun PetDetailScreen(
                 )
             }
 
-            // CONTENIDO DEL DETALLE
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp)
-            ) {
-                // Nombre y Caso Urgente
+            Column(modifier = Modifier.padding(16.dp)) {
+                // Estado y Alerta Urgente
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = pet.name,
-                        fontSize = 26.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    // Badge de estado
+                    Surface(
+                        color = if (pet.status == PetStatus.DISPONIBLE) Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            text = if (pet.status == PetStatus.DISPONIBLE) "DISPONIBLE" else "ADOPTADA",
+                            color = if (pet.status == PetStatus.DISPONIBLE) Color(0xFF2E7D32) else Color(0xFFC62828),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        )
+                    }
 
-                    if (pet.isUrgent) {
+                    if (pet.isUrgent && pet.status == PetStatus.DISPONIBLE) {
                         Surface(
-                            color = MaterialTheme.colorScheme.error,
+                            color = MaterialTheme.colorScheme.errorContainer,
                             shape = RoundedCornerShape(8.dp)
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Warning,
                                     contentDescription = null,
-                                    tint = Color.White,
+                                    tint = MaterialTheme.colorScheme.error,
                                     modifier = Modifier.size(14.dp)
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = "CASO URGENTE",
-                                    color = Color.White,
-                                    fontSize = 11.sp,
+                                    text = "Adopción Urgente",
+                                    color = MaterialTheme.colorScheme.error,
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
@@ -171,32 +179,40 @@ fun PetDetailScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Nombre y Raza
+                Text(
+                    text = pet.name,
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
 
                 Text(
-                    text = "${pet.breed} · ${pet.species}",
+                    text = "${pet.breed} • ${pet.species}",
                     fontSize = 16.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Fila de chips de características
+                // Ficha Técnica Rápida (Edad, Sexo, Tamaño)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    DetailFeatureChip(label = "Edad", value = "${pet.ageYears} ${if (pet.ageYears == 1) "año" else "años"}")
-                    DetailFeatureChip(label = "Sexo", value = pet.gender)
-                    DetailFeatureChip(label = "Tamaño", value = pet.size)
+                    TarjetaCaracteristica(etiqueta = "Edad", valor = "${pet.ageYears} años", modifier = Modifier.weight(1f))
+                    TarjetaCaracteristica(etiqueta = "Sexo", valor = pet.gender, modifier = Modifier.weight(1f))
+                    TarjetaCaracteristica(etiqueta = "Tamaño", valor = pet.size, modifier = Modifier.weight(1f))
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                // Datos del Refugio
+                // Refugio y Ubicación
                 Card(
                     shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -211,13 +227,13 @@ fun PetDetailScreen(
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Text(
-                                text = "Refugio a cargo: ${pet.shelterName}",
+                                text = pet.shelterName,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
+                                fontSize = 15.sp
                             )
                             Text(
-                                text = "Distrito: ${pet.location}",
-                                fontSize = 12.sp,
+                                text = "Zona: ${pet.location}",
+                                fontSize = 13.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -226,8 +242,9 @@ fun PetDetailScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // Historia y Descripción
                 Text(
-                    text = "Historia y Personalidad",
+                    text = "Conoce a ${pet.name}",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -236,34 +253,56 @@ fun PetDetailScreen(
 
                 Text(
                     text = pet.description,
-                    fontSize = 15.sp,
+                    fontSize = 14.sp,
                     lineHeight = 22.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // RF7: MAPA DE UBICACIÓN DEL REFUGIO
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Map,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Ubicación Aproximada del Refugio (RF7)",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "Por seguridad y protección de los animalitos, se muestra la zona del refugio en ${pet.location}.",
+                    fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
-                // 🗺️ SECCIÓN RF7: MAPA DE UBICACIÓN REAL Y RUTA EN GOOGLE MAPS
-                Text(
-                    text = "Ubicación del Refugio en el Mapa (RF7)",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-
+                // Cuadro del Mapa
                 Card(
                     shape = RoundedCornerShape(16.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(220.dp)
+                        .height(180.dp)
                 ) {
                     Box(modifier = Modifier.fillMaxSize()) {
                         GoogleMap(
                             modifier = Modifier.fillMaxSize(),
-                            cameraPositionState = cameraPositionState
+                            cameraPositionState = estadoCamara
                         ) {
                             Marker(
-                                state = MarkerState(position = petLocation),
+                                state = MarkerState(position = ubicacionMascota),
                                 title = pet.shelterName,
                                 snippet = "Ubicación de adopción: ${pet.location}"
                             )
@@ -276,18 +315,18 @@ fun PetDetailScreen(
                 // Botón abrir ruta en Google Maps (RF7 Criterio oficial)
                 Button(
                     onClick = {
-                        val gmmIntentUri = Uri.parse("geo:${pet.latitude},${pet.longitude}?q=${pet.latitude},${pet.longitude}(${Uri.encode(pet.shelterName)})")
-                        val mapIntent = Intent(Intent.ACTION_VIEW, gmmIntentUri).apply {
+                        val uriNavegacion = Uri.parse("geo:${pet.latitude},${pet.longitude}?q=${pet.latitude},${pet.longitude}(${Uri.encode(pet.shelterName)})")
+                        val intentMapa = Intent(Intent.ACTION_VIEW, uriNavegacion).apply {
                             setPackage("com.google.android.apps.maps")
                         }
                         try {
-                            context.startActivity(mapIntent)
+                            contexto.startActivity(intentMapa)
                         } catch (_: Exception) {
-                            val fallbackIntent = Intent(
+                            val intentNavegador = Intent(
                                 Intent.ACTION_VIEW,
                                 Uri.parse("https://www.google.com/maps/search/?api=1&query=${pet.latitude},${pet.longitude}")
                             )
-                            context.startActivity(fallbackIntent)
+                            contexto.startActivity(intentNavegador)
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
@@ -303,9 +342,9 @@ fun PetDetailScreen(
 
                 // BOTÓN CHAT CON EL REFUGIO (RF13)
                 if (currentUser != null && currentUser.role != UserRole.REFUGIO) {
-                    val chatId = "chat_${pet.id}_${currentUser.id}"
+                    val idChat = "chat_${pet.id}_${currentUser.id}"
                     OutlinedButton(
-                        onClick = { onChatClick(chatId, pet.shelterName) },
+                        onClick = { onChatClick(idChat, pet.shelterName) },
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -396,7 +435,7 @@ fun PetDetailScreen(
                         }
 
                         OutlinedButton(
-                            onClick = { showDeleteDialog = true },
+                            onClick = { mostrarDialogoEliminar = true },
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.weight(1f)
@@ -425,15 +464,15 @@ fun PetDetailScreen(
         }
     }
 
-    if (showDeleteDialog) {
+    if (mostrarDialogoEliminar) {
         AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
+            onDismissRequest = { mostrarDialogoEliminar = false },
             title = { Text("¿Eliminar publicación?") },
             text = { Text("Esta acción retirará a ${pet.name} de la base de datos en la nube.") },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        showDeleteDialog = false
+                        mostrarDialogoEliminar = false
                         onDeleteClick(pet.id)
                     }
                 ) {
@@ -441,7 +480,7 @@ fun PetDetailScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) {
+                TextButton(onClick = { mostrarDialogoEliminar = false }) {
                     Text("Cancelar")
                 }
             }
@@ -450,17 +489,18 @@ fun PetDetailScreen(
 }
 
 @Composable
-fun DetailFeatureChip(label: String, value: String) {
+fun TarjetaCaracteristica(etiqueta: String, valor: String, modifier: Modifier = Modifier) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(12.dp),
+        modifier = modifier
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(text = label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(text = value, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            Text(text = etiqueta, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(text = valor, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         }
     }
 }

@@ -24,16 +24,30 @@ class PublishViewModel : ViewModel() {
     // RF3: Lista de URIs de fotos seleccionadas desde la galería del celular (hasta 5)
     var selectedPhotoUris by mutableStateOf<List<Uri>>(emptyList())
 
+    // Alias en español para fácil lectura y explicación en la sustentación
+    val estaGuardando: Boolean
+        get() = isSaving
+
+    val mensajeEstado: String?
+        get() = statusMessage
+
+    val fotosSeleccionadas: List<Uri>
+        get() = selectedPhotoUris
+
     fun onPhotosSelected(uris: List<Uri>) {
         // Limitamos a un máximo de 5 fotos según el criterio de aceptación del RF3
         selectedPhotoUris = uris.take(5)
     }
+
+    fun alSeleccionarFotos(uris: List<Uri>) = onPhotosSelected(uris)
 
     fun removePhoto(index: Int) {
         if (index in selectedPhotoUris.indices) {
             selectedPhotoUris = selectedPhotoUris.toMutableList().also { it.removeAt(index) }
         }
     }
+
+    fun quitarFoto(indice: Int) = removePhoto(indice)
 
     fun savePet(
         context: Context,

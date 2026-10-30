@@ -38,26 +38,26 @@ fun ChatScreen(
     onBackClick: () -> Unit,
     viewModel: ChatViewModel = viewModel()
 ) {
-    val messages by viewModel.messages.collectAsState()
-    val inputText by viewModel.inputText.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-    val currentUser by AppwriteAuthRepository.currentUser.collectAsState()
+    val mensajes by viewModel.listaMensajes.collectAsState()
+    val textoMensaje by viewModel.textoEntrada.collectAsState()
+    val estaCargando by viewModel.estaCargando.collectAsState()
+    val usuarioActual by AppwriteAuthRepository.currentUser.collectAsState()
 
-    val listState = rememberLazyListState()
+    val estadoLista = rememberLazyListState()
 
     // Inicializar chat
     LaunchedEffect(chatId) {
-        viewModel.initChat(
-            chatId = chatId,
-            petName = petName,
-            receiverName = receiverName
+        viewModel.inicializarChat(
+            idChat = chatId,
+            nombreMascota = petName,
+            nombreDestinatario = receiverName
         )
     }
 
     // Auto-scroll hacia el último mensaje cuando llega uno nuevo
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
+    LaunchedEffect(mensajes.size) {
+        if (mensajes.isNotEmpty()) {
+            estadoLista.animateScrollToItem(mensajes.size - 1)
         }
     }
 
@@ -131,8 +131,8 @@ fun ChatScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     OutlinedTextField(
-                        value = inputText,
-                        onValueChange = { viewModel.onInputTextChanged(it) },
+                        value = textoMensaje,
+                        onValueChange = { viewModel.cambiarTextoMensaje(it) },
                         placeholder = { Text("Escribe un mensaje...") },
                         modifier = Modifier
                             .weight(1f)
@@ -141,20 +141,20 @@ fun ChatScreen(
                         maxLines = 4
                     )
                     IconButton(
-                        onClick = { viewModel.sendMessage() },
-                        enabled = inputText.isNotBlank(),
+                        onClick = { viewModel.enviarMensaje() },
+                        enabled = textoMensaje.isNotBlank(),
                         modifier = Modifier
                             .size(48.dp)
                             .clip(CircleShape)
                             .background(
-                                if (inputText.isNotBlank()) MaterialTheme.colorScheme.primary
+                                if (textoMensaje.isNotBlank()) MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.surfaceVariant
                             )
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.Send,
                             contentDescription = "Enviar",
-                            tint = if (inputText.isNotBlank()) MaterialTheme.colorScheme.onPrimary
+                            tint = if (textoMensaje.isNotBlank()) MaterialTheme.colorScheme.onPrimary
                             else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -168,19 +168,19 @@ fun ChatScreen(
                 .padding(innerPadding)
                 .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.95f))
         ) {
-            if (isLoading && messages.isEmpty()) {
+            if (estaCargando && mensajes.isEmpty()) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             } else {
                 LazyColumn(
-                    state = listState,
+                    state = estadoLista,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(messages) { message ->
-                        val isMe = message.senderId == (currentUser?.id ?: "user_me") || message.senderId != "shelter_host"
-                        MessageBubble(message = message, isMe = isMe)
+                    items(mensajes) { mensaje ->
+                        val esMio = mensaje.senderId == (usuarioActual?.id ?: "user_me") || mensaje.senderId != "shelter_host"
+                        BurbujaMensaje(message = mensaje, isMe = esMio)
                     }
                 }
             }
@@ -189,26 +189,26 @@ fun ChatScreen(
 }
 
 @Composable
-private fun MessageBubble(message: ChatMessage, isMe: Boolean) {
-    val alignment = if (isMe) Alignment.End else Alignment.Start
-    val bubbleColor = if (isMe) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
-    val textColor = if (isMe) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-    val bubbleShape = if (isMe) {
+private fun BurbujaMensaje(message: ChatMessage, isMe: Boolean) {
+    val alineacion = if (isMe) Alignment.End else Alignment.Start
+    val colorBurbuja = if (isMe) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+    val colorTexto = if (isMe) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+    val formaBurbuja = if (isMe) {
         RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 2.dp)
     } else {
         RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 2.dp, bottomEnd = 16.dp)
     }
 
-    val timeFormatter = remember { SimpleDateFormat("hh:mm a", Locale.getDefault()) }
-    val timeString = remember(message.timestamp) { timeFormatter.format(Date(message.timestamp)) }
+    val formatoHora = remember { SimpleDateFormat("hh:mm a", Locale.getDefault()) }
+    val textoHora = remember(message.timestamp) { formatoHora.format(Date(message.timestamp)) }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = alignment
+        horizontalAlignment = alineacion
     ) {
         Card(
-            shape = bubbleShape,
-            colors = CardDefaults.cardColors(containerColor = bubbleColor),
+            shape = formaBurbuja,
+            colors = CardDefaults.cardColors(containerColor = colorBurbuja),
             modifier = Modifier.widthIn(max = 280.dp)
         ) {
             Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
@@ -225,7 +225,7 @@ private fun MessageBubble(message: ChatMessage, isMe: Boolean) {
                 Text(
                     text = message.text,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = textColor
+                    color = colorTexto
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))
@@ -235,10 +235,10 @@ private fun MessageBubble(message: ChatMessage, isMe: Boolean) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = timeString,
+                        text = textoHora,
                         style = MaterialTheme.typography.labelSmall,
                         fontSize = 10.sp,
-                        color = textColor.copy(alpha = 0.7f)
+                        color = colorTexto.copy(alpha = 0.7f)
                     )
                     if (isMe) {
                         Spacer(modifier = Modifier.width(4.dp))
@@ -246,7 +246,7 @@ private fun MessageBubble(message: ChatMessage, isMe: Boolean) {
                             imageVector = Icons.Default.DoneAll,
                             contentDescription = "Enviado",
                             modifier = Modifier.size(14.dp),
-                            tint = if (message.isRead) Color(0xFF1E88E5) else textColor.copy(alpha = 0.7f)
+                            tint = if (message.isRead) Color(0xFF1E88E5) else colorTexto.copy(alpha = 0.7f)
                         )
                     }
                 }

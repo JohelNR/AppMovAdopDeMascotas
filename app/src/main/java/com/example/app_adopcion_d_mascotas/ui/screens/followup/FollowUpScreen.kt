@@ -1,9 +1,11 @@
 package com.example.app_adopcion_d_mascotas.ui.screens.followup
 
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -19,7 +21,6 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Pets
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -46,24 +47,24 @@ fun FollowUpScreen(
     followUpViewModel: FollowUpViewModel = viewModel(),
     onBackClick: () -> Unit
 ) {
-    val context = LocalContext.current
-    val snackbarHostState = remember { SnackbarHostState() }
+    val contexto = LocalContext.current
+    val estadoSnackbar = remember { SnackbarHostState() }
 
     LaunchedEffect(pet) {
-        pet?.let { followUpViewModel.loadFollowUps(it.id) }
+        pet?.let { followUpViewModel.cargarSeguimientos(it.id) }
     }
 
-    LaunchedEffect(followUpViewModel.statusMessage) {
-        followUpViewModel.statusMessage?.let { msg ->
-            snackbarHostState.showSnackbar(msg)
-            followUpViewModel.statusMessage = null
+    LaunchedEffect(followUpViewModel.mensajeEstado) {
+        followUpViewModel.mensajeEstado?.let { mensaje ->
+            estadoSnackbar.showSnackbar(mensaje)
+            followUpViewModel.mensajeEstado = null
         }
     }
 
-    var showCreateDialog by remember { mutableStateOf(false) }
+    var mostrarDialogoCrear by remember { mutableStateOf(false) }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { SnackbarHost(estadoSnackbar) },
         topBar = {
             TopAppBar(
                 title = {
@@ -81,7 +82,7 @@ fun FollowUpScreen(
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = { showCreateDialog = true },
+                onClick = { mostrarDialogoCrear = true },
                 icon = { Icon(imageVector = Icons.Default.Description, contentDescription = null) },
                 text = { Text("Nuevo Reporte") }
             )
@@ -99,9 +100,9 @@ fun FollowUpScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            if (followUpViewModel.isLoading) {
+            if (followUpViewModel.estaCargando) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-            } else if (followUpViewModel.followUpsList.isEmpty()) {
+            } else if (followUpViewModel.listaSeguimientos.isEmpty()) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -110,132 +111,164 @@ fun FollowUpScreen(
                     verticalArrangement = Arrangement.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Pets,
+                        imageVector = Icons.Default.Description,
                         contentDescription = null,
                         modifier = Modifier.size(64.dp),
                         tint = MaterialTheme.colorScheme.outline
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = "Sin reportes de seguimiento aún",
+                        text = "Aún no hay reportes de seguimiento",
                         fontWeight = FontWeight.Bold,
                         fontSize = 17.sp
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "El adoptante puede enviar fotos y reportes periódicos para verificar el bienestar y adaptación de ${pet.name}.",
-                        color = MaterialTheme.colorScheme.outline,
+                        text = "Sé el primero en registrar cómo se encuentra ${pet.name} en su nuevo hogar.",
                         fontSize = 13.sp,
-                        modifier = Modifier.padding(horizontal = 24.dp)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             } else {
                 LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
-                    modifier = Modifier.fillMaxSize()
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    items(followUpViewModel.followUpsList) { report ->
-                        FollowUpCard(report = report)
+                    items(followUpViewModel.listaSeguimientos) { reporte ->
+                        TarjetaReporteSeguimiento(followUp = reporte)
                     }
                 }
             }
         }
     }
 
-    if (showCreateDialog && pet != null && currentUser != null) {
-        CreateFollowUpDialog(
+    if (mostrarDialogoCrear && pet != null && currentUser != null) {
+        DialogoCrearSeguimiento(
             pet = pet,
             currentUser = currentUser,
             followUpViewModel = followUpViewModel,
-            onDismiss = { showCreateDialog = false },
-            onSubmitted = { showCreateDialog = false }
+            onDismiss = { mostrarDialogoCrear = false },
+            onSubmitted = {
+                mostrarDialogoCrear = false
+            }
         )
     }
 }
 
 @Composable
-fun FollowUpCard(report: PetFollowUp) {
+fun TarjetaReporteSeguimiento(followUp: PetFollowUp) {
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            // Cabecera: Fecha y Postulante
+        Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(
-                        text = "📅 ${report.date}",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Favorite,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = "Reporte de ${followUp.applicantName.ifBlank { "Adoptante" }}",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp
+                        )
+                        Text(
+                            text = "Fecha: ${followUp.date}",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
 
-                Text(
-                    text = "Por: ${report.applicantName}",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = Color(0xFFE8F5E9)
+                ) {
+                    Text(
+                        text = followUp.status,
+                        color = Color(0xFF2E7D32),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                    )
+                }
             }
 
-            // Fotos del animalito en su nuevo hogar (RF11)
-            val photos = report.getPhotoUrls()
-            if (photos.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Fotos del reporte
+            val fotos = followUp.getAllPhotoUrls()
+            if (fotos.isNotEmpty()) {
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    items(photos) { photoUrl ->
+                    items(fotos) { urlFoto ->
                         AsyncImage(
-                            model = photoUrl,
+                            model = urlFoto,
                             contentDescription = "Foto de seguimiento",
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
-                                .size(120.dp)
-                                .clip(RoundedCornerShape(12.dp))
+                                .size(110.dp)
+                                .clip(RoundedCornerShape(10.dp))
                         )
                     }
                 }
+                Spacer(modifier = Modifier.height(12.dp))
             }
 
             // Notas de Salud
-            Row(verticalAlignment = Alignment.Top) {
-                Icon(
-                    imageVector = Icons.Default.HealthAndSafety,
-                    contentDescription = null,
-                    tint = Color(0xFF2E7D32),
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Column {
-                    Text("Salud y vacunas:", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    Text(text = report.healthNotes, fontSize = 13.sp)
+            if (followUp.healthNotes.isNotBlank()) {
+                Row(verticalAlignment = Alignment.Top) {
+                    Icon(
+                        imageVector = Icons.Default.HealthAndSafety,
+                        contentDescription = null,
+                        tint = Color(0xFF388E3C),
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Column {
+                        Text(text = "Salud y Bienestar:", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text(text = followUp.healthNotes, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
+                    }
                 }
+                Spacer(modifier = Modifier.height(8.dp))
             }
 
             // Notas de Adaptación
-            Row(verticalAlignment = Alignment.Top) {
-                Icon(
-                    imageVector = Icons.Default.Home,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Column {
-                    Text("Adaptación y comportamiento:", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    Text(text = report.adaptationNotes, fontSize = 13.sp)
+            if (followUp.adaptationNotes.isNotBlank()) {
+                Row(verticalAlignment = Alignment.Top) {
+                    Icon(
+                        imageVector = Icons.Default.Home,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Column {
+                        Text(text = "Adaptación al Hogar:", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text(text = followUp.adaptationNotes, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
+                    }
                 }
             }
         }
@@ -243,21 +276,21 @@ fun FollowUpCard(report: PetFollowUp) {
 }
 
 @Composable
-fun CreateFollowUpDialog(
+fun DialogoCrearSeguimiento(
     pet: Pet,
     currentUser: User,
     followUpViewModel: FollowUpViewModel,
     onDismiss: () -> Unit,
     onSubmitted: () -> Unit
 ) {
-    val context = LocalContext.current
-    var healthNotes by remember { mutableStateOf("") }
-    var adaptationNotes by remember { mutableStateOf("") }
+    val contexto = LocalContext.current
+    var notasSalud by remember { mutableStateOf("") }
+    var notasAdaptacion by remember { mutableStateOf("") }
 
-    val photoPickerLauncher = rememberLauncherForActivityResult(
+    val lanzadorSelectorFotos = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 3)
     ) { uris ->
-        followUpViewModel.onPhotosSelected(uris)
+        followUpViewModel.seleccionarFotos(uris)
     }
 
     AlertDialog(
@@ -280,7 +313,7 @@ fun CreateFollowUpDialog(
                 // Botón selector de fotos
                 OutlinedButton(
                     onClick = {
-                        photoPickerLauncher.launch(
+                        lanzadorSelectorFotos.launch(
                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                         )
                     },
@@ -288,16 +321,16 @@ fun CreateFollowUpDialog(
                 ) {
                     Icon(imageVector = Icons.Default.AddAPhoto, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Adjuntar fotos del hogar (${followUpViewModel.selectedPhotos.size}/3)")
+                    Text("Adjuntar fotos del hogar (${followUpViewModel.fotosSeleccionadas.size}/3)")
                 }
 
                 // Miniatura de fotos seleccionadas
-                if (followUpViewModel.selectedPhotos.isNotEmpty()) {
+                if (followUpViewModel.fotosSeleccionadas.isNotEmpty()) {
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(followUpViewModel.selectedPhotos.size) { index ->
+                        items(followUpViewModel.fotosSeleccionadas.size) { indice ->
                             Box(modifier = Modifier.size(60.dp)) {
                                 AsyncImage(
-                                    model = followUpViewModel.selectedPhotos[index],
+                                    model = followUpViewModel.fotosSeleccionadas[indice],
                                     contentDescription = null,
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier
@@ -305,7 +338,7 @@ fun CreateFollowUpDialog(
                                         .clip(RoundedCornerShape(8.dp))
                                 )
                                 IconButton(
-                                    onClick = { followUpViewModel.removePhoto(index) },
+                                    onClick = { followUpViewModel.eliminarFoto(indice) },
                                     modifier = Modifier
                                         .size(20.dp)
                                         .align(Alignment.TopEnd)
@@ -318,16 +351,16 @@ fun CreateFollowUpDialog(
                 }
 
                 OutlinedTextField(
-                    value = healthNotes,
-                    onValueChange = { healthNotes = it },
+                    value = notasSalud,
+                    onValueChange = { notasSalud = it },
                     label = { Text("Estado de salud, peso y vacunas") },
                     maxLines = 3,
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 OutlinedTextField(
-                    value = adaptationNotes,
-                    onValueChange = { adaptationNotes = it },
+                    value = notasAdaptacion,
+                    onValueChange = { notasAdaptacion = it },
                     label = { Text("Comportamiento y adaptación al hogar") },
                     maxLines = 3,
                     modifier = Modifier.fillMaxWidth()
@@ -338,17 +371,17 @@ fun CreateFollowUpDialog(
             Button(
                 onClick = {
                     followUpViewModel.submitReport(
-                        context = context,
+                        context = contexto,
                         pet = pet,
                         currentUser = currentUser,
-                        healthNotes = healthNotes,
-                        adaptationNotes = adaptationNotes,
+                        healthNotes = notasSalud,
+                        adaptationNotes = notasAdaptacion,
                         onSuccess = onSubmitted
                     )
                 },
-                enabled = !followUpViewModel.isSubmitting
+                enabled = !followUpViewModel.estaEnviando
             ) {
-                if (followUpViewModel.isSubmitting) {
+                if (followUpViewModel.estaEnviando) {
                     CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White)
                 } else {
                     Text("Enviar Reporte")
@@ -356,7 +389,7 @@ fun CreateFollowUpDialog(
             }
         },
         dismissButton = {
-            OutlinedButton(onClick = onDismiss, enabled = !followUpViewModel.isSubmitting) {
+            OutlinedButton(onClick = onDismiss, enabled = !followUpViewModel.estaEnviando) {
                 Text("Cancelar")
             }
         }

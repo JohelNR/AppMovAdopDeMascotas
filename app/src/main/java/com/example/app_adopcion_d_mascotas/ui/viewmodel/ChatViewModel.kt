@@ -23,6 +23,16 @@ class ChatViewModel : ViewModel() {
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    // Alias en español para fácil lectura y explicación
+    val listaMensajes: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
+    val textoEntrada: StateFlow<String> = _inputText.asStateFlow()
+    val estaCargando: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    fun cambiarTextoMensaje(nuevoTexto: String) = onInputTextChanged(nuevoTexto)
+    fun enviarMensaje() = sendMessage()
+    fun inicializarChat(idChat: String, nombreMascota: String, nombreDestinatario: String = "Refugio") =
+        initChat(idChat, nombreMascota, nombreDestinatario)
+
     private var currentChatId: String = ""
     private var currentPetName: String = ""
     private var currentReceiverName: String = "Refugio"

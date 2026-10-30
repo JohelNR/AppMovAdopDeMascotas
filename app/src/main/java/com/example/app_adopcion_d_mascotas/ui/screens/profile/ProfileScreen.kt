@@ -1,9 +1,9 @@
 package com.example.app_adopcion_d_mascotas.ui.screens.profile
 
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -60,35 +60,35 @@ fun ProfileScreen(
     onPetClick: (String) -> Unit,
     onChatClick: (String, String) -> Unit // chatId, receiverName
 ) {
-    val context = LocalContext.current
-    val snackbarHostState = remember { SnackbarHostState() }
+    val contexto = LocalContext.current
+    val estadoSnackbar = remember { SnackbarHostState() }
 
     LaunchedEffect(currentUser) {
-        profileViewModel.loadProfile(currentUser)
+        profileViewModel.cargarPerfil(currentUser)
     }
 
-    LaunchedEffect(profileViewModel.statusMessage) {
-        profileViewModel.statusMessage?.let { msg ->
-            snackbarHostState.showSnackbar(msg)
-            profileViewModel.statusMessage = null
+    LaunchedEffect(profileViewModel.mensajeEstado) {
+        profileViewModel.mensajeEstado?.let { mensaje ->
+            estadoSnackbar.showSnackbar(mensaje)
+            profileViewModel.mensajeEstado = null
         }
     }
 
-    val user = profileViewModel.currentUser ?: currentUser
-    var showEditDialog by remember { mutableStateOf(false) }
+    val usuario = profileViewModel.usuarioActual ?: currentUser
+    var mostrarDialogoEditar by remember { mutableStateOf(false) }
 
     // Lanzador PhotoPicker para foto de avatar (RF2)
-    val avatarPickerLauncher = rememberLauncherForActivityResult(
+    val lanzadorSelectorFoto = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         if (uri != null) {
-            profileViewModel.onAvatarSelected(uri)
-            showEditDialog = true
+            profileViewModel.seleccionarAvatar(uri)
+            mostrarDialogoEditar = true
         }
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { SnackbarHost(estadoSnackbar) },
         topBar = {
             TopAppBar(
                 title = { Text("Mi Perfil", fontWeight = FontWeight.Bold) },
@@ -109,7 +109,7 @@ fun ProfileScreen(
             )
         }
     ) { paddingValues ->
-        if (user == null) {
+        if (usuario == null) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
@@ -140,13 +140,13 @@ fun ProfileScreen(
                         modifier = Modifier
                             .size(96.dp)
                             .clickable {
-                                avatarPickerLauncher.launch(
+                                lanzadorSelectorFoto.launch(
                                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                                 )
                             }
                     ) {
                         AsyncImage(
-                            model = profileViewModel.selectedAvatarUri ?: user.avatarUrl,
+                            model = profileViewModel.selectedAvatarUri ?: usuario.avatarUrl,
                             contentDescription = "Foto de perfil",
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
@@ -176,13 +176,13 @@ fun ProfileScreen(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Text(
-                        text = user.name,
+                        text = usuario.name,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     )
 
                     Text(
-                        text = user.email,
+                        text = usuario.email,
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -191,17 +191,17 @@ fun ProfileScreen(
 
                     // Chip de Rol (Adoptante o Refugio)
                     Surface(
-                        color = if (user.role == UserRole.REFUGIO)
+                        color = if (usuario.role == UserRole.REFUGIO)
                             MaterialTheme.colorScheme.primaryContainer
                         else
                             MaterialTheme.colorScheme.secondaryContainer,
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Text(
-                            text = if (user.role == UserRole.REFUGIO) "🏠 Refugio Verificado" else "🐾 Adoptante Responsable",
+                            text = if (usuario.role == UserRole.REFUGIO) "🏠 Refugio Verificado" else "🐾 Adoptante Responsable",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = if (user.role == UserRole.REFUGIO)
+                            color = if (usuario.role == UserRole.REFUGIO)
                                 MaterialTheme.colorScheme.onPrimaryContainer
                             else
                                 MaterialTheme.colorScheme.onSecondaryContainer,
@@ -209,28 +209,28 @@ fun ProfileScreen(
                         )
                     }
 
-                    if (user.bio.isNotBlank()) {
+                    if (usuario.bio.isNotBlank()) {
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = user.bio,
+                            text = usuario.bio,
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     }
 
-                    if (user.phone.isNotBlank()) {
+                    if (usuario.phone.isNotBlank()) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(imageVector = Icons.Default.Phone, contentDescription = null, modifier = Modifier.size(14.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text(text = user.phone, fontSize = 12.sp)
+                            Text(text = usuario.phone, fontSize = 12.sp)
                         }
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
 
                     Button(
-                        onClick = { showEditDialog = true },
+                        onClick = { mostrarDialogoEditar = true },
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -242,15 +242,15 @@ fun ProfileScreen(
             }
 
             // CONTENIDO DE LA PESTAÑA SEGÚN ROL (RF2)
-            if (user.role == UserRole.REFUGIO) {
+            if (usuario.role == UserRole.REFUGIO) {
                 Text(
-                    text = "Mis Publicaciones Activas (${profileViewModel.myPets.size})",
+                    text = "Mis Publicaciones Activas (${profileViewModel.misMascotas.size})",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
 
-                if (profileViewModel.myPets.isEmpty()) {
+                if (profileViewModel.misMascotas.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text("No has publicado mascotas aún.", color = MaterialTheme.colorScheme.outline)
                     }
@@ -262,20 +262,20 @@ fun ProfileScreen(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        items(profileViewModel.myPets) { pet ->
-                            ShelterPetGridCard(pet = pet, onClick = { onPetClick(pet.id) })
+                        items(profileViewModel.misMascotas) { mascota ->
+                            TarjetaCuadriculaMascota(pet = mascota, onClick = { onPetClick(mascota.id) })
                         }
                     }
                 }
             } else {
                 Text(
-                    text = "Mis Solicitudes de Adopción (${profileViewModel.myRequests.size})",
+                    text = "Mis Solicitudes de Adopción (${profileViewModel.misSolicitudes.size})",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
 
-                if (profileViewModel.myRequests.isEmpty()) {
+                if (profileViewModel.misSolicitudes.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text("No has enviado solicitudes aún.", color = MaterialTheme.colorScheme.outline)
                     }
@@ -285,11 +285,11 @@ fun ProfileScreen(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        items(profileViewModel.myRequests) { request ->
-                            ApplicantRequestCard(
-                                request = request,
+                        items(profileViewModel.misSolicitudes) { solicitud ->
+                            TarjetaSolicitudAdoptante(
+                                request = solicitud,
                                 onChatClick = {
-                                    onChatClick("chat_${request.petId}_${request.applicantId}", request.shelterName)
+                                    onChatClick("chat_${solicitud.petId}_${solicitud.applicantId}", solicitud.shelterName)
                                 }
                             )
                         }
@@ -300,16 +300,16 @@ fun ProfileScreen(
     }
 
     // DIÁLOGO MODAL EDITAR PERFIL (Con soporte anti-teclado)
-    if (showEditDialog && user != null) {
-        EditProfileDialog(
-            user = user,
+    if (mostrarDialogoEditar && usuario != null) {
+        DialogoEditarPerfil(
+            user = usuario,
             avatarUri = profileViewModel.selectedAvatarUri,
-            isSaving = profileViewModel.isSaving,
-            onDismiss = { showEditDialog = false },
-            onSave = { name, phone, bio ->
-                profileViewModel.saveProfile(context, name, phone, bio) { updatedUser ->
-                    showEditDialog = false
-                    onUserUpdated(updatedUser)
+            isSaving = profileViewModel.estaGuardando,
+            onDismiss = { mostrarDialogoEditar = false },
+            onSave = { nombre, telefono, biografia ->
+                profileViewModel.saveProfile(contexto, nombre, telefono, biografia) { usuarioActualizado ->
+                    mostrarDialogoEditar = false
+                    onUserUpdated(usuarioActualizado)
                 }
             }
         )
@@ -317,7 +317,7 @@ fun ProfileScreen(
 }
 
 @Composable
-fun ShelterPetGridCard(pet: Pet, onClick: () -> Unit) {
+fun TarjetaCuadriculaMascota(pet: Pet, onClick: () -> Unit) {
     Card(
         shape = RoundedCornerShape(14.dp),
         modifier = Modifier
@@ -342,7 +342,7 @@ fun ShelterPetGridCard(pet: Pet, onClick: () -> Unit) {
 }
 
 @Composable
-fun ApplicantRequestCard(
+fun TarjetaSolicitudAdoptante(
     request: AdoptionRequest,
     onChatClick: () -> Unit
 ) {
@@ -378,16 +378,16 @@ fun ApplicantRequestCard(
 }
 
 @Composable
-fun EditProfileDialog(
+fun DialogoEditarPerfil(
     user: User,
-    avatarUri: android.net.Uri?,
+    avatarUri: Uri?,
     isSaving: Boolean,
     onDismiss: () -> Unit,
-    onSave: (name: String, phone: String, bio: String) -> Unit
+    onSave: (nombre: String, telefono: String, biografia: String) -> Unit
 ) {
-    var name by remember { mutableStateOf(user.name) }
-    var phone by remember { mutableStateOf(user.phone) }
-    var bio by remember { mutableStateOf(user.bio) }
+    var nombre by remember { mutableStateOf(user.name) }
+    var telefono by remember { mutableStateOf(user.phone) }
+    var biografia by remember { mutableStateOf(user.bio) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -401,16 +401,16 @@ fun EditProfileDialog(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
+                    value = nombre,
+                    onValueChange = { nombre = it },
                     label = { Text("Nombre o Nombre del Refugio") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 OutlinedTextField(
-                    value = phone,
-                    onValueChange = { if (it.length <= 9) phone = it },
+                    value = telefono,
+                    onValueChange = { if (it.length <= 9) telefono = it },
                     label = { Text("Teléfono de contacto (9 dígitos)") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
@@ -418,8 +418,8 @@ fun EditProfileDialog(
                 )
 
                 OutlinedTextField(
-                    value = bio,
-                    onValueChange = { bio = it },
+                    value = biografia,
+                    onValueChange = { biografia = it },
                     label = { Text("Biografía / Descripción") },
                     maxLines = 3,
                     modifier = Modifier.fillMaxWidth()
@@ -428,7 +428,7 @@ fun EditProfileDialog(
         },
         confirmButton = {
             Button(
-                onClick = { onSave(name, phone, bio) },
+                onClick = { onSave(nombre, telefono, biografia) },
                 enabled = !isSaving
             ) {
                 if (isSaving) {

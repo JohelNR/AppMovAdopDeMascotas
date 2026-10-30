@@ -32,6 +32,27 @@ class FollowUpViewModel : ViewModel() {
 
     var selectedPhotos by mutableStateOf<List<Uri>>(emptyList())
 
+    // Alias en español para lectura directa
+    val listaSeguimientos: List<PetFollowUp>
+        get() = followUpsList
+
+    val estaCargando: Boolean
+        get() = isLoading
+
+    val estaEnviando: Boolean
+        get() = isSubmitting
+
+    var mensajeEstado: String?
+        get() = statusMessage
+        set(value) { statusMessage = value }
+
+    val fotosSeleccionadas: List<Uri>
+        get() = selectedPhotos
+
+    fun cargarSeguimientos(idMascota: String) = loadFollowUps(idMascota)
+    fun seleccionarFotos(uris: List<Uri>) = onPhotosSelected(uris)
+    fun eliminarFoto(indice: Int) = removePhoto(indice)
+
     fun onPhotosSelected(uris: List<Uri>) {
         selectedPhotos = uris.take(3)
     }
@@ -59,43 +80,51 @@ class FollowUpViewModel : ViewModel() {
         adaptationNotes: String,
         onSuccess: () -> Unit
     ) {
-        if (healthNotes.isBlank() || adaptationNotes.isBlank()) {
-            statusMessage = "Por favor completa el estado de salud y notas de adaptación"
+        if (healthNotes.isBlank() && adaptationNotes.isBlank()) {
+            statusMessage = "Por favor ingresa notas sobre la salud o adaptación de la mascota"
             return
         }
 
         viewModelScope.launch {
             isSubmitting = true
-            statusMessage = "Subiendo fotos y guardando reporte..."
+            statusMessage = null
 
-            val uploadedPhotoIds = mutableListOf<String>()
+            // Subir fotos adjuntas a Storage de Appwrite
+            val uploadedPhotoUrls = mutableListOf<String>()
             for (uri in selectedPhotos) {
-                val photoId = AppwriteStorageRepository.uploadPhoto(context, uri)
-                if (photoId != null) {
-                    uploadedPhotoIds.add(photoId)
+                val fileId = AppwriteStorageRepository.uploadPhoto(context, uri)
+                if (fileId != null) {
+                    uploadedPhotoUrls.add(fileId)
                 }
             }
 
-            val currentDate = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())
-            val report = PetFollowUp(
+            val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+            val todayDate = dateFormat.format(Date())
+
+            val newReport = PetFollowUp(
                 petId = pet.id,
                 petName = pet.name,
                 applicantId = currentUser.id,
                 applicantName = currentUser.name,
                 shelterName = pet.shelterName,
-                date = currentDate,
+                date = todayDate,
                 healthNotes = healthNotes.trim(),
                 adaptationNotes = adaptationNotes.trim(),
-                photos = uploadedPhotoIds,
-                status = "ENVIADO"
+                photos = uploadedPhotoUrls,
+                status = "REVISADO"
             )
 
-            AppwriteFollowUpRepository.createFollowUp(report)
+            val success = AppwriteFollowUpRepository.createFollowUp(newReport)
             isSubmitting = false
-            statusMessage = "¡Reporte de seguimiento registrado con éxito!"
-            selectedPhotos = emptyList()
-            loadFollowUps(pet.id)
-            onSuccess()
+
+            if (success) {
+                selectedPhotos = emptyList()
+                statusMessage = "¡Reporte de seguimiento registrado con éxito!"
+                loadFollowUps(pet.id)
+                onSuccess()
+            } else {
+                statusMessage = "Error al guardar reporte en la nube"
+            }
         }
     }
 }

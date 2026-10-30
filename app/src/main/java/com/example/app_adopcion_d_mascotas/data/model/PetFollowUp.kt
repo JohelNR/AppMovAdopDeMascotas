@@ -20,4 +20,8 @@ data class PetFollowUp(
     fun getPhotoUrls(): List<String> {
         return photos.map { AppwriteClient.getFileViewUrl(it) }
     }
+
+    fun getAllPhotoUrls(): List<String> = getPhotoUrls()
+
+    fun obtenerUrlsFotos(): List<String> = getPhotoUrls()
 }

@@ -36,11 +36,11 @@ fun AdoptionFormScreen(
         return
     }
 
-    val context = LocalContext.current
-    var reason by remember { mutableStateOf("") }
-    var hasYard by remember { mutableStateOf(false) }
-    var hasExperience by remember { mutableStateOf(false) }
-    var termsAccepted by remember { mutableStateOf(false) }
+    val contexto = LocalContext.current
+    var motivo by remember { mutableStateOf("") }
+    var tienePatio by remember { mutableStateOf(false) }
+    var tieneExperiencia by remember { mutableStateOf(false) }
+    var terminosAceptados by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -83,12 +83,13 @@ fun AdoptionFormScreen(
                         Text(
                             text = "Postulando para: ${pet.name}",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
+                            fontSize = 18.sp,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                         Text(
-                            text = "Refugio: ${pet.shelterName} • ${pet.breed}",
+                            text = "${pet.breed} • ${pet.shelterName}",
                             fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                         )
                     }
                 }
@@ -96,7 +97,7 @@ fun AdoptionFormScreen(
 
             // Datos del Adoptante
             Text(
-                text = "Datos del Adoptante",
+                text = "Tus Datos de Contacto",
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp
             )
@@ -106,91 +107,115 @@ fun AdoptionFormScreen(
                 onValueChange = {},
                 readOnly = true,
                 label = { Text("Nombre Completo") },
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
             )
 
             OutlinedTextField(
                 value = currentUser.email,
                 onValueChange = {},
                 readOnly = true,
-                label = { Text("Correo de Contacto") },
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth()
+                label = { Text("Correo Electrónico") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
             )
 
             HorizontalDivider()
 
-            // Preguntas Clave del Cuestionario de Adopción (RF8)
+            // Preguntas del cuestionario
             Text(
-                text = "Cuestionario de Adopción Responsable",
+                text = "Cuestionario de Tenencia Responsable",
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp
             )
 
+            // Motivo
             OutlinedTextField(
-                value = reason,
-                onValueChange = { reason = it },
+                value = motivo,
+                onValueChange = { motivo = it },
                 label = { Text("¿Por qué deseas adoptar a ${pet.name}? *") },
-                placeholder = { Text("Cuéntanos sobre tu rutina, tu familia y por qué es el compañero ideal...") },
+                placeholder = { Text("Describe brevemente tu motivación y cómo cuidarás a la mascota...") },
+                modifier = Modifier.fillMaxWidth(),
                 minLines = 3,
-                maxLines = 6,
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth()
+                maxLines = 5,
+                shape = RoundedCornerShape(12.dp)
             )
 
-            // Switch Patio
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("¿Cuentas con patio o espacio adecuado?", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                    Text("Casa o departamento con área para que juegue", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Switch(checked = hasYard, onCheckedChange = { hasYard = it })
-            }
-
-            // Switch Experiencia
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("¿Tienes experiencia previa con mascotas?", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                    Text("Has cuidado perros o gatos anteriormente", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Switch(checked = hasExperience, onCheckedChange = { hasExperience = it })
-            }
-
-            // Checkbox Términos y Condiciones Obligatorios (RF8)
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
+            // Checkbox: Tiene patio / espacio abierto
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Checkbox(
-                    checked = termsAccepted,
-                    onCheckedChange = { termsAccepted = it }
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Acepto el compromiso de tenencia responsable, visitas de seguimiento y cuidados veterinarios requeridos.",
-                    fontSize = 13.sp,
-                    lineHeight = 18.sp
-                )
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = tienePatio,
+                        onCheckedChange = { tienePatio = it }
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text("Vivienda con patio o espacio amplio", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        Text("Cuentas con lugar adecuado para el movimiento de la mascota", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
             }
 
-            // Feedback Message
-            requestsViewModel.feedbackMessage?.let { msg ->
+            // Checkbox: Experiencia previa con mascotas
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = tieneExperiencia,
+                        onCheckedChange = { tieneExperiencia = it }
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text("Experiencia previa con mascotas", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        Text("Has cuidado animales antes y conoces sus necesidades", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+
+            // Compromiso de tenencia responsable
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = terminosAceptados,
+                        onCheckedChange = { terminosAceptados = it }
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text("Compromiso de cuidado y salud *", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("Acepto brindar alimentación, veterinario y cariño permanente.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+
+            // Mensaje de feedback si hay error de validación
+            requestsViewModel.mensajeRespuesta?.let { mensaje ->
                 Surface(
                     color = MaterialTheme.colorScheme.secondaryContainer,
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = msg,
+                        text = mensaje,
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSecondaryContainer,
                         modifier = Modifier.padding(12.dp)
@@ -206,21 +231,21 @@ fun AdoptionFormScreen(
                         petName = pet.name,
                         applicant = currentUser,
                         shelterName = pet.shelterName,
-                        reason = reason,
-                        hasYard = hasYard,
-                        hasExperience = hasExperience,
-                        termsAccepted = termsAccepted,
-                        context = context,
+                        reason = motivo,
+                        hasYard = tienePatio,
+                        hasExperience = tieneExperiencia,
+                        termsAccepted = terminosAceptados,
+                        context = contexto,
                         onSuccess = onRequestSubmitted
                     )
                 },
-                enabled = !requestsViewModel.isLoading,
+                enabled = !requestsViewModel.estaCargando,
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp)
             ) {
-                if (requestsViewModel.isLoading) {
+                if (requestsViewModel.estaCargando) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(24.dp),
                         color = MaterialTheme.colorScheme.onPrimary

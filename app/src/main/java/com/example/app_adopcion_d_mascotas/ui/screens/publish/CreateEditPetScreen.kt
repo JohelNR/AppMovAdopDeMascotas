@@ -43,22 +43,23 @@ fun CreateEditPetScreen(
     onBackClick: () -> Unit,
     onSavedSuccessfully: () -> Unit
 ) {
-    val context = LocalContext.current
-    val isEditing = existingPet != null
+    val contexto = LocalContext.current
+    val esEdicion = existingPet != null
 
-    var name by remember { mutableStateOf(existingPet?.name ?: "") }
-    var breed by remember { mutableStateOf(existingPet?.breed ?: "") }
-    var species by remember { mutableStateOf(existingPet?.species ?: "Perro") }
-    var ageText by remember { mutableStateOf(existingPet?.ageYears?.toString() ?: "1") }
-    var gender by remember { mutableStateOf(existingPet?.gender ?: "Macho") }
-    var size by remember { mutableStateOf(existingPet?.size ?: "Mediano") }
-    var location by remember { mutableStateOf(existingPet?.location ?: "Lima") }
-    var shelterName by remember { mutableStateOf(existingPet?.shelterName ?: currentUser?.name ?: "Refugio") }
-    var description by remember { mutableStateOf(existingPet?.description ?: "") }
-    var isUrgent by remember { mutableStateOf(existingPet?.isUrgent ?: false) }
+    // Variables de estado en español
+    var nombre by remember { mutableStateOf(existingPet?.name ?: "") }
+    var raza by remember { mutableStateOf(existingPet?.breed ?: "") }
+    var especie by remember { mutableStateOf(existingPet?.species ?: "Perro") }
+    var textoEdad by remember { mutableStateOf(existingPet?.ageYears?.toString() ?: "1") }
+    var sexo by remember { mutableStateOf(existingPet?.gender ?: "Macho") }
+    var tamano by remember { mutableStateOf(existingPet?.size ?: "Mediano") }
+    var ubicacion by remember { mutableStateOf(existingPet?.location ?: "Lima") }
+    var nombreRefugio by remember { mutableStateOf(existingPet?.shelterName ?: currentUser?.name ?: "Refugio") }
+    var descripcion by remember { mutableStateOf(existingPet?.description ?: "") }
+    var esUrgente by remember { mutableStateOf(existingPet?.isUrgent ?: false) }
 
-    // RF3: PhotoPicker oficial de Android para seleccionar hasta 5 fotos reales
-    val photoPickerLauncher = rememberLauncherForActivityResult(
+    // RF3: Selector oficial de fotos para hasta 5 fotos reales
+    val selectorFotosLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 5)
     ) { uris ->
         if (uris.isNotEmpty()) {
@@ -69,7 +70,7 @@ fun CreateEditPetScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (isEditing) "Editar Mascota" else "Publicar Mascota") },
+                title = { Text(if (esEdicion) "Editar Mascota" else "Publicar Mascota") },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás")
@@ -97,7 +98,7 @@ fun CreateEditPetScreen(
 
             Button(
                 onClick = {
-                    photoPickerLauncher.launch(
+                    selectorFotosLauncher.launch(
                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                     )
                 },
@@ -110,11 +111,11 @@ fun CreateEditPetScreen(
             }
 
             // Vista previa de fotos seleccionadas
-            if (publishViewModel.selectedPhotoUris.isNotEmpty()) {
+            if (publishViewModel.fotosSeleccionadas.isNotEmpty()) {
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    itemsIndexed(publishViewModel.selectedPhotoUris) { index, uri ->
+                    itemsIndexed(publishViewModel.fotosSeleccionadas) { indice, uri ->
                         Box(
                             modifier = Modifier
                                 .size(100.dp)
@@ -122,14 +123,14 @@ fun CreateEditPetScreen(
                         ) {
                             AsyncImage(
                                 model = uri,
-                                contentDescription = "Foto $index",
+                                contentDescription = "Foto $indice",
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize()
                             )
 
                             // Botón para eliminar foto individual
                             IconButton(
-                                onClick = { publishViewModel.removePhoto(index) },
+                                onClick = { publishViewModel.quitarFoto(indice) },
                                 modifier = Modifier
                                     .align(Alignment.TopEnd)
                                     .size(24.dp)
@@ -145,7 +146,7 @@ fun CreateEditPetScreen(
                         }
                     }
                 }
-            } else if (isEditing && existingPet?.photos?.isNotEmpty() == true) {
+            } else if (esEdicion && existingPet?.photos?.isNotEmpty() == true) {
                 Text(
                     text = "Conserva las ${existingPet.photos.size} fotos ya subidas a la nube, o selecciona nuevas arriba.",
                     fontSize = 12.sp,
@@ -155,8 +156,8 @@ fun CreateEditPetScreen(
 
             // CAMPOS DE FORMULARIO
             OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
+                value = nombre,
+                onValueChange = { nombre = it },
                 label = { Text("Nombre de la mascota *") },
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
@@ -168,19 +169,19 @@ fun CreateEditPetScreen(
                 Text("Especie *", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("Perro", "Gato").forEach { item ->
+                    listOf("Perro", "Gato").forEach { opcion ->
                         FilterChip(
-                            selected = species == item,
-                            onClick = { species = item },
-                            label = { Text(item) }
+                            selected = especie == opcion,
+                            onClick = { especie = opcion },
+                            label = { Text(opcion) }
                         )
                     }
                 }
             }
 
             OutlinedTextField(
-                value = breed,
-                onValueChange = { breed = it },
+                value = raza,
+                onValueChange = { raza = it },
                 label = { Text("Raza *") },
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
@@ -188,8 +189,8 @@ fun CreateEditPetScreen(
             )
 
             OutlinedTextField(
-                value = ageText,
-                onValueChange = { ageText = it },
+                value = textoEdad,
+                onValueChange = { textoEdad = it },
                 label = { Text("Edad aproximada (en años) *") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
@@ -202,11 +203,11 @@ fun CreateEditPetScreen(
                 Text("Sexo *", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("Macho", "Hembra").forEach { item ->
+                    listOf("Macho", "Hembra").forEach { opcion ->
                         FilterChip(
-                            selected = gender == item,
-                            onClick = { gender = item },
-                            label = { Text(item) }
+                            selected = sexo == opcion,
+                            onClick = { sexo = opcion },
+                            label = { Text(opcion) }
                         )
                     }
                 }
@@ -217,19 +218,19 @@ fun CreateEditPetScreen(
                 Text("Tamaño *", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("Pequeño", "Mediano", "Grande").forEach { item ->
+                    listOf("Pequeño", "Mediano", "Grande").forEach { opcion ->
                         FilterChip(
-                            selected = size == item,
-                            onClick = { size = item },
-                            label = { Text(item) }
+                            selected = tamano == opcion,
+                            onClick = { tamano = opcion },
+                            label = { Text(opcion) }
                         )
                     }
                 }
             }
 
             OutlinedTextField(
-                value = location,
-                onValueChange = { location = it },
+                value = ubicacion,
+                onValueChange = { ubicacion = it },
                 label = { Text("Ubicación / Ciudad *") },
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
@@ -237,8 +238,8 @@ fun CreateEditPetScreen(
             )
 
             OutlinedTextField(
-                value = shelterName,
-                onValueChange = { shelterName = it },
+                value = nombreRefugio,
+                onValueChange = { nombreRefugio = it },
                 label = { Text("Nombre del Refugio responsable *") },
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
@@ -246,8 +247,8 @@ fun CreateEditPetScreen(
             )
 
             OutlinedTextField(
-                value = description,
-                onValueChange = { description = it },
+                value = descripcion,
+                onValueChange = { descripcion = it },
                 label = { Text("Historia y Personalidad *") },
                 minLines = 3,
                 maxLines = 6,
@@ -265,11 +266,11 @@ fun CreateEditPetScreen(
                     Text("¿Es un caso urgente?", fontWeight = FontWeight.Bold)
                     Text("Se destacará al inicio del feed", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Switch(checked = isUrgent, onCheckedChange = { isUrgent = it })
+                Switch(checked = esUrgente, onCheckedChange = { esUrgente = it })
             }
 
             // Mensajes de estado
-            publishViewModel.statusMessage?.let { msg ->
+            publishViewModel.mensajeEstado?.let { msg ->
                 Surface(
                     color = MaterialTheme.colorScheme.secondaryContainer,
                     shape = RoundedCornerShape(8.dp),
@@ -287,30 +288,30 @@ fun CreateEditPetScreen(
             // BOTÓN GUARDAR
             Button(
                 onClick = {
-                    val age = ageText.toIntOrNull() ?: 1
+                    val edad = textoEdad.toIntOrNull() ?: 1
                     publishViewModel.savePet(
-                        context = context,
+                        context = contexto,
                         existingPet = existingPet,
-                        name = name,
-                        breed = breed,
-                        species = species,
-                        ageYears = age,
-                        description = description,
-                        shelterName = shelterName,
-                        isUrgent = isUrgent,
-                        gender = gender,
-                        size = size,
-                        location = location,
+                        name = nombre,
+                        breed = raza,
+                        species = especie,
+                        ageYears = edad,
+                        description = descripcion,
+                        shelterName = nombreRefugio,
+                        isUrgent = esUrgente,
+                        gender = sexo,
+                        size = tamano,
+                        location = ubicacion,
                         onSuccess = onSavedSuccessfully
                     )
                 },
-                enabled = !publishViewModel.isSaving,
+                enabled = !publishViewModel.estaGuardando,
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp)
             ) {
-                if (publishViewModel.isSaving) {
+                if (publishViewModel.estaGuardando) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(24.dp),
                         color = MaterialTheme.colorScheme.onPrimary
@@ -319,7 +320,7 @@ fun CreateEditPetScreen(
                     Text("Subiendo a la nube...")
                 } else {
                     Text(
-                        text = if (isEditing) "Actualizar en la Nube" else "Publicar en la Nube",
+                        text = if (esEdicion) "Actualizar en la Nube" else "Publicar en la Nube",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold
                     )

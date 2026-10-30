@@ -1,6 +1,5 @@
 package com.example.app_adopcion_d_mascotas.ui.screens.appointments
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -38,8 +37,8 @@ fun AppointmentsScreen(
         requestsViewModel.loadAppointments(currentUser)
     }
 
-    val appointments = requestsViewModel.appointmentsList
-    val isLoading = requestsViewModel.isLoading
+    val listaCitas = requestsViewModel.appointmentsList
+    val estaCargando = requestsViewModel.isLoading
 
     Scaffold(
         topBar = {
@@ -71,9 +70,9 @@ fun AppointmentsScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            if (isLoading) {
+            if (estaCargando) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-            } else if (appointments.isEmpty()) {
+            } else if (listaCitas.isEmpty()) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -111,12 +110,12 @@ fun AppointmentsScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    items(appointments, key = { it.id }) { appointment ->
+                    items(listaCitas, key = { it.id }) { cita ->
                         AppointmentCard(
-                            appointment = appointment,
-                            currentUser = currentUser,
-                            onConfirmClick = {
-                                requestsViewModel.confirmAppointment(appointment.id, currentUser)
+                            cita = cita,
+                            usuarioActual = currentUser,
+                            alConfirmar = {
+                                requestsViewModel.confirmAppointment(cita.id, currentUser)
                             }
                         )
                     }
@@ -128,9 +127,9 @@ fun AppointmentsScreen(
 
 @Composable
 fun AppointmentCard(
-    appointment: Appointment,
-    currentUser: User?,
-    onConfirmClick: () -> Unit
+    cita: Appointment,
+    usuarioActual: User?,
+    alConfirmar: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -159,13 +158,13 @@ fun AppointmentCard(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Entrevista: ${appointment.petName}",
+                        text = "Entrevista: ${cita.petName}",
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp
                     )
                 }
 
-                AppointmentStatusChip(status = appointment.status)
+                AppointmentStatusChip(estado = cita.status)
             }
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
@@ -191,7 +190,7 @@ fun AppointmentCard(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "${appointment.date} • ${appointment.time}",
+                            text = "${cita.date} • ${cita.time}",
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -208,7 +207,7 @@ fun AppointmentCard(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                imageVector = if (appointment.modality.contains("Virtual", ignoreCase = true))
+                                imageVector = if (cita.modality.contains("Virtual", ignoreCase = true))
                                     Icons.Default.Videocam
                                 else
                                     Icons.Default.LocationOn,
@@ -218,7 +217,7 @@ fun AppointmentCard(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = appointment.modality,
+                                text = cita.modality,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -238,7 +237,7 @@ fun AppointmentCard(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Adoptante: ${appointment.applicantName}",
+                        text = "Adoptante: ${cita.applicantName}",
                         fontSize = 13.sp
                     )
                 }
@@ -252,7 +251,7 @@ fun AppointmentCard(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Refugio: ${appointment.shelterName}",
+                        text = "Refugio: ${cita.shelterName}",
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -260,9 +259,9 @@ fun AppointmentCard(
             }
 
             // Botón de Confirmación si está en estado PROPUESTA
-            if (appointment.status == AppointmentStatus.PROPUESTA) {
+            if (cita.status == AppointmentStatus.PROPUESTA) {
                 Button(
-                    onClick = onConfirmClick,
+                    onClick = alConfirmar,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
@@ -281,20 +280,20 @@ fun AppointmentCard(
 }
 
 @Composable
-fun AppointmentStatusChip(status: AppointmentStatus) {
-    val (bgColor, textColor, label) = when (status) {
+fun AppointmentStatusChip(estado: AppointmentStatus) {
+    val (colorFondo, colorTexto, etiqueta) = when (estado) {
         AppointmentStatus.PROPUESTA -> Triple(Color(0xFFFFF3E0), Color(0xFFE65100), "Propuesta")
         AppointmentStatus.CONFIRMADA -> Triple(Color(0xFFE8F5E9), Color(0xFF2E7D32), "Confirmada")
         AppointmentStatus.RECHAZADA -> Triple(Color(0xFFFFEBEE), Color(0xFFC62828), "Cancelada")
     }
 
     Surface(
-        color = bgColor,
+        color = colorFondo,
         shape = RoundedCornerShape(12.dp)
     ) {
         Text(
-            text = label,
-            color = textColor,
+            text = etiqueta,
+            color = colorTexto,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)

@@ -36,6 +36,26 @@ class ProfileViewModel : ViewModel() {
     var myRequests by mutableStateOf<List<AdoptionRequest>>(emptyList())
         private set
 
+    // Alias en español para fácil lectura y explicación
+    val usuarioActual: User?
+        get() = currentUser
+
+    val estaGuardando: Boolean
+        get() = isSaving
+
+    var mensajeEstado: String?
+        get() = statusMessage
+        set(value) { statusMessage = value }
+
+    val misMascotas: List<Pet>
+        get() = myPets
+
+    val misSolicitudes: List<AdoptionRequest>
+        get() = myRequests
+
+    fun cargarPerfil(usuario: User?) = loadProfile(usuario)
+    fun seleccionarAvatar(uri: Uri) = onAvatarSelected(uri)
+
     fun loadProfile(user: User?) {
         currentUser = user
         if (user == null) return

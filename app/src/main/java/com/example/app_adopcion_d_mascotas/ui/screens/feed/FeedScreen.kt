@@ -263,8 +263,8 @@ fun FeedScreen(
                             ) {
                                 items(feedViewModel.mascotasUrgentes) { mascotaUrgente ->
                                     PetCard(
-                                        pet = mascotaUrgente,
-                                        onClick = { onPetClick(mascotaUrgente.id) },
+                                        mascota = mascotaUrgente,
+                                        alHacerClic = { onPetClick(mascotaUrgente.id) },
                                         modifier = Modifier.width(280.dp)
                                     )
                                 }
@@ -281,8 +281,8 @@ fun FeedScreen(
                     // Lista general de mascotas filtradas
                     items(feedViewModel.mascotasFiltradas, key = { it.id }) { mascota ->
                         PetCard(
-                            pet = mascota,
-                            onClick = { onPetClick(mascota.id) }
+                            mascota = mascota,
+                            alHacerClic = { onPetClick(mascota.id) }
                         )
                     }
                 }

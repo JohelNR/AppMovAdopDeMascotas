@@ -24,8 +24,8 @@ import com.example.app_adopcion_d_mascotas.data.model.PetStatus
 
 @Composable
 fun PetCard(
-    pet: Pet,
-    onClick: () -> Unit,
+    mascota: Pet,
+    alHacerClic: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -36,7 +36,7 @@ fun PetCard(
         ),
         modifier = modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .clickable { alHacerClic() }
     ) {
         Column {
             // 1. Imagen de la mascota con Coil + Badges flotantes
@@ -46,8 +46,8 @@ fun PetCard(
                     .height(200.dp)
             ) {
                 AsyncImage(
-                    model = pet.displayPhoto,
-                    contentDescription = "Foto de ${pet.name}",
+                    model = mascota.displayPhoto,
+                    contentDescription = "Foto de ${mascota.name}",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxSize()
@@ -55,7 +55,7 @@ fun PetCard(
                 )
 
                 // Indicador de cantidad de fotos si tiene varias
-                if (pet.photos.size > 1) {
+                if (mascota.photos.size > 1) {
                     Surface(
                         color = Color.Black.copy(alpha = 0.6f),
                         shape = RoundedCornerShape(12.dp),
@@ -75,7 +75,7 @@ fun PetCard(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "${pet.photos.size}",
+                                text = "${mascota.photos.size}",
                                 color = Color.White,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
@@ -85,7 +85,7 @@ fun PetCard(
                 }
 
                 // Badge de Urgente sobre la foto (RF5)
-                if (pet.isUrgent) {
+                if (mascota.isUrgent) {
                     Surface(
                         color = MaterialTheme.colorScheme.error,
                         shape = RoundedCornerShape(bottomEnd = 12.dp),
@@ -123,7 +123,7 @@ fun PetCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (pet.species == "Perro") pet.name + "🐶" else pet.name + "🐱",
+                        text = if (mascota.species == "Perro") mascota.name + " 🐶" else mascota.name + " 🐱",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -131,12 +131,12 @@ fun PetCard(
 
                     // Chip de sexo (Macho / Hembra)
                     Surface(
-                        color = if (pet.gender == "Hembra") Color(0xFFFCE4EC) else Color(0xFFE3F2FD),
+                        color = if (mascota.gender == "Hembra") Color(0xFFFCE4EC) else Color(0xFFE3F2FD),
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Text(
-                            text = pet.gender,
-                            color = if (pet.gender == "Hembra") Color(0xFFC2185B) else Color(0xFF1976D2),
+                            text = mascota.gender,
+                            color = if (mascota.gender == "Hembra") Color(0xFFC2185B) else Color(0xFF1976D2),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
@@ -147,7 +147,7 @@ fun PetCard(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = "${pet.species} • ${pet.breed} • ${pet.ageYears} ${if (pet.ageYears == 1) "año" else "años"} • ${pet.size}",
+                    text = "${mascota.species} • ${mascota.breed} • ${mascota.ageYears} ${if (mascota.ageYears == 1) "año" else "años"} • ${mascota.size}",
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -165,7 +165,7 @@ fun PetCard(
                     )
                     Spacer(modifier = Modifier.width(2.dp))
                     Text(
-                        text = "${pet.location} · ${pet.shelterName}",
+                        text = "${mascota.location} · ${mascota.shelterName}",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Medium
@@ -173,7 +173,7 @@ fun PetCard(
                 }
 
                 // Indicador de adoptada
-                if (pet.status == PetStatus.ADOPTADA) {
+                if (mascota.status == PetStatus.ADOPTADA) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Surface(
                         color = MaterialTheme.colorScheme.secondaryContainer,
