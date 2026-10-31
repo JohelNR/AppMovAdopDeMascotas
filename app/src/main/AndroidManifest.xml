@@ -38,7 +38,7 @@
 
         <!-- Receptor de alarmas para recordatorios de citas (RF20) -->
         <receiver
-            android:name=".notifications.AppointmentReminderReceiver"
+            android:name=".notificaciones.AppointmentReminderReceiver"
             android:exported="false" />
 
     </application>
