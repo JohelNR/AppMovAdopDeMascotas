@@ -19,6 +19,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.rememberNavController
 import com.example.app_adopcion_d_mascotas.datos.modelos.RolUsuario
 import com.example.app_adopcion_d_mascotas.datos.modelos.User
 import com.example.app_adopcion_d_mascotas.datos.modelos.UserRole
@@ -37,9 +39,6 @@ fun PantallaInicioSesion(
     var contrasena by remember { mutableStateOf("") }
     var rolSeleccionado by remember { mutableStateOf(RolUsuario.ADOPTANTE) }
     var modoRegistro by remember { mutableStateOf(false) }
-    var mostrarDialogoRecuperar by remember { mutableStateOf(false) }
-    var correoRecuperacion by remember { mutableStateOf("") }
-    var mensajeRecuperacion by remember { mutableStateOf<String?>(null) }
 
     Column(
         modifier = Modifier
@@ -197,19 +196,6 @@ fun PantallaInicioSesion(
             )
         }
 
-        // Recuperar contraseña
-        if (!modoRegistro) {
-            TextButton(
-                onClick = { mostrarDialogoRecuperar = true }
-            ) {
-                Text(
-                    text = "¿Olvidaste tu contraseña? Recupérala aquí",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.secondary
-                )
-            }
-        }
-
         Spacer(modifier = Modifier.height(16.dp))
 
         // Inicio de sesión con Google
@@ -274,64 +260,4 @@ fun PantallaInicioSesion(
             }
         }
     }
-
-    // Ventana emergente para Recuperar Contraseña
-    if (mostrarDialogoRecuperar) {
-        AlertDialog(
-            onDismissRequest = {
-                mostrarDialogoRecuperar = false
-                mensajeRecuperacion = null
-            },
-            title = {
-                Text("Recuperar Contraseña", fontWeight = FontWeight.Bold)
-            },
-            text = {
-                Column {
-                    Text(
-                        "Ingresa tu correo registrado para recibir las instrucciones de restablecimiento:",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = correoRecuperacion,
-                        onValueChange = { correoRecuperacion = it },
-                        label = { Text("Correo electrónico") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    mensajeRecuperacion?.let { mensaje ->
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = mensaje,
-                            color = MaterialTheme.colorScheme.primary,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (correoRecuperacion.isNotBlank()) {
-                            mensajeRecuperacion = "¡Enlace de recuperación enviado con éxito a $correoRecuperacion!"
-                        }
-                    }
-                ) {
-                    Text("Enviar")
-                }
-            },
-            dismissButton = {
-                OutlinedButton(onClick = { mostrarDialogoRecuperar = false }) {
-                    Text("Cerrar")
-                }
-            }
-        )
-    }
 }
-
-// Alias para compatibilidad total
-@Composable
-fun LoginScreen(
-    authViewModel: ModeloAutenticacion = viewModel(),
-    onLoginSuccess: (Usuario) -> Unit
-) = PantallaInicioSesion(authViewModel, onLoginSuccess)
