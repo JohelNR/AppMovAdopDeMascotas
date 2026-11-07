@@ -13,10 +13,6 @@ import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.example.app_adopcion_d_mascotas.MainActivity
-import java.time.LocalDateTime
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.format.ResolverStyle
 
 // RF14 & RF20: Utilidad para Notificaciones locales y Recordatorios de Citas
 object AyudanteNotificaciones {
@@ -95,10 +91,9 @@ object AyudanteNotificaciones {
         shelterName: String,
         date: String,
         time: String,
-        triggerAtMillis: Long = fechaHoraMillis(date, time) ?: 0L
+        triggerAtMillis: Long = System.currentTimeMillis() + 10_000 // Por defecto 10s para pruebas en vivo
     ) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
-        if (triggerAtMillis <= System.currentTimeMillis()) return
 
         val intent = Intent(context, AppointmentReminderReceiver::class.java).apply {
             putExtra(AppointmentReminderReceiver.EXTRA_TITLE, "📅 Recordatorio de Cita: $petName")
@@ -146,13 +141,8 @@ object AyudanteNotificaciones {
         nombreRefugio: String,
         fecha: String,
         hora: String,
-        milisegundosDisparo: Long = fechaHoraMillis(fecha, hora) ?: 0L
+        milisegundosDisparo: Long = System.currentTimeMillis() + 10_000
     ) = scheduleAppointmentAlarm(contexto, idCita, nombreMascota, nombreRefugio, fecha, hora, milisegundosDisparo)
-
-    fun fechaHoraMillis(fecha: String, hora: String): Long? = try {
-        LocalDateTime.parse("$fecha $hora", DateTimeFormatter.ofPattern("dd/MM/uuuu HH:mm")
-            .withResolverStyle(ResolverStyle.STRICT)).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-    } catch (_: java.time.DateTimeException) { null }
 }
 
 typealias NotificationHelper = AyudanteNotificaciones

@@ -19,7 +19,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         // Inicializamos el cliente oficial de Appwrite Cloud
-        // Appwrite se inicializa una sola vez en AplicacionMascotas.
+        ClienteAppwrite.init(applicationContext)
 
         // Inicializar canal de notificaciones (RF14, RF20)
         AyudanteNotificaciones.crearCanalNotificaciones(applicationContext)

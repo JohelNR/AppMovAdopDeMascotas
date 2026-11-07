@@ -1,6 +1,6 @@
 # Configuración de Appwrite
 
-`datos/remoto/ClienteAppwrite.kt` conserva el endpoint y los identificadores que ya tenía el repositorio destino:
+`datos/remoto/ClienteAppwrite.kt` (igual al del compañero) usa estos identificadores:
 
 | Recurso | Identificador |
 |---|---|
@@ -28,13 +28,13 @@ Registrar la plataforma Android `com.example.app_adopcion_d_mascotas`. Activar r
 | Colección | Campos usados por el cliente |
 |---|---|
 | Perfiles | `userId`, `name`, `email`, `role`, `phone`, `bio`, `avatarPhotoId`: string |
-| Mascotas | `name`, `breed`, `species`, `description`, `shelterName`, `status`, `gender`, `size`, `location`: string; `ageYears`: integer; `isUrgent`: boolean; `photos`: string[]; **`latitude`, `longitude`: float** |
+| Mascotas | `name`, `breed`, `species`, `description`, `shelterName`, `status`, `gender`, `size`, `location`: string; `ageYears`: integer; `isUrgent`: boolean; `photos`: string[]; `latitude`, `longitude`: float (opcionales; el modelo usa Lima por defecto) |
 | Solicitudes | `petId`, `petName`, `applicantId`, `applicantName`, `applicantEmail`, **`shelterNames`**, `reason`, `status`: string; `hasYard`, `hasExperience`, `termsAccepted`: boolean |
 | Citas | `requestId`, `petName`, `applicantName`, `shelterName`, `date`, `time`, `modality`, `status`: string |
 | Seguimientos | `petId`, `petName`, `applicantId`, `applicantName`, `shelterName`, `date`, `healthNotes`, `adaptationNotes`, `status`: string; `photos`: string[] |
 | Mensajes | `chatId`, `petName`, `senderId`, `senderName`, `receiverId`, `text`: string; `timestamp`: integer de 64 bits (milisegundos); `isRead`: boolean |
 
-Añadir las coordenadas como opcionales para conservar documentos antiguos; el formulario nuevo exige coordenadas válidas. `petName` de mensajes puede estar vacío al abrir desde perfil. `phone`, `bio` y `avatarPhotoId` también pueden estar vacíos.
+`petName` de mensajes puede estar vacío al abrir desde perfil. `phone`, `bio` y `avatarPhotoId` también pueden estar vacíos.
 
 ### Valores de estado
 
@@ -55,14 +55,8 @@ Los permisos del servidor deben permitir leer/escribir los documentos correspond
 - Perfiles: la búsqueda del interlocutor necesita acceso de lectura a su perfil. El uso heredado de nombres exige nombres de interlocutor únicos para resolver el chat.
 - Mascotas, solicitudes, citas y archivos: aplicar permisos de propietario/refugio según las reglas existentes. El `role` escrito en un perfil no configura automáticamente roles o Teams de Appwrite.
 
-La migración del cliente no crea reglas remotas, índices ni Functions. Si falta un atributo, una colección o un permiso, corregirlo en la consola y volver a probar; no habilitar simulaciones como sustitución.
+El cliente no crea reglas remotas, índices ni Functions. Si falta un atributo, una colección o un permiso, hay que corregirlo en la consola. Los usuarios Google y Demo del login son locales y no tienen sesión en Appwrite.
 
 ## Google Maps
 
-Crear una clave con Maps SDK for Android habilitado y restricción al package y certificado de firma correspondientes. Definirla en `~/.gradle/gradle.properties`:
-
-```properties
-MAPS_API_KEY=tu_clave
-```
-
-También puede pasarse con `-PMAPS_API_KEY=...`. El manifest usa un placeholder; no contiene la clave ficticia del ZIP. Sin clave, el resto de la aplicación se puede compilar y ejecutar.
+El manifest trae, igual que el proyecto del compañero, la clave de ejemplo `AIzaSyDemoMapsKeyAdopcionMascotas` en `com.google.android.geo.API_KEY`. Para que el mapa cargue, hay que reemplazarla por una clave real con Maps SDK for Android habilitado, restringida al package `com.example.app_adopcion_d_mascotas` y al certificado de firma.

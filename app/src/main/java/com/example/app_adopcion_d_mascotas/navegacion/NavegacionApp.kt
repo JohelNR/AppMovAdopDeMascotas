@@ -5,17 +5,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.TextButton
-import com.example.app_adopcion_d_mascotas.ui.modelovista.ModeloAutenticacion
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
-import com.example.app_adopcion_d_mascotas.di.modeloVista as viewModel
-import com.example.app_adopcion_d_mascotas.di.contenedorApp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -44,43 +38,13 @@ fun NavegacionApp() {
     // 1. El controlador de navegación oficial de Google Compose
     val controladorNavegacion = rememberNavController()
     val alcanceCorrutina = rememberCoroutineScope()
-    var errorOperacion by remember { mutableStateOf<String?>(null) }
-    errorOperacion?.let { mensaje ->
-        AlertDialog(
-            onDismissRequest = { errorOperacion = null },
-            title = { Text("No se pudo completar la operación") },
-            text = { Text(mensaje) },
-            confirmButton = { TextButton(onClick = { errorOperacion = null }) { Text("Aceptar") } }
-        )
-    }
 
     // 2. ViewModels compartidos para todo el ciclo de vida de la aplicación
     val modeloCatalogo: ModeloCatalogo = viewModel()
     val modeloSolicitudes: ModeloSolicitudes = viewModel()
-    val modeloAutenticacion: ModeloAutenticacion = viewModel()
 
     // 3. Estado en memoria del usuario actualmente conectado
-    val dependencias = contenedorApp()
-    val usuarioActual by dependencias.autenticacion.usuarioActual.collectAsStateWithLifecycle()
-    if (!modeloAutenticacion.sesionVerificada) {
-        CircularProgressIndicator()
-        return
-    }
-    LaunchedEffect(usuarioActual?.id) {
-        if (usuarioActual == null) {
-            modeloSolicitudes.limpiarSesion()
-            controladorNavegacion.navigate(Ruta.InicioSesion.ruta) {
-                popUpTo(0) { inclusive = true }
-                launchSingleTop = true
-            }
-        } else if (controladorNavegacion.currentDestination?.route == Ruta.InicioSesion.ruta) {
-            modeloCatalogo.cargarMascotas()
-            controladorNavegacion.navigate(Ruta.Catalogo.ruta) {
-                popUpTo(Ruta.InicioSesion.ruta) { inclusive = true }
-                launchSingleTop = true
-            }
-        }
-    }
+    var usuarioActual by remember { mutableStateOf<Usuario?>(null) }
 
     // 4. El NavHost envuelto en FondoApp para el fondo con huellitas en toda la app
     FondoApp {
@@ -91,10 +55,12 @@ fun NavegacionApp() {
             // RUTA 1: Login y Registro (RF1)
             composable(Ruta.InicioSesion.ruta) {
                 PantallaInicioSesion(
-                    modeloAutenticacion = modeloAutenticacion,
                     alIniciarSesion = { usuarioConectado ->
-                        dependencias.autenticacion.usuarioActual.value = usuarioConectado
+                        usuarioActual = usuarioConectado
                         modeloCatalogo.cargarMascotas()
+                        controladorNavegacion.navigate(Ruta.Catalogo.ruta) {
+                            popUpTo(Ruta.InicioSesion.ruta) { inclusive = true }
+                        }
                     }
                 )
             }
@@ -120,8 +86,9 @@ fun NavegacionApp() {
                         controladorNavegacion.navigate(Ruta.Perfil.ruta)
                     },
                     alCerrarSesion = {
-                        alcanceCorrutina.launch {
-                            if (!dependencias.autenticacion.logout()) errorOperacion = "No se pudo cerrar la sesión en Appwrite. Revisa tu conexión."
+                        usuarioActual = null
+                        controladorNavegacion.navigate(Ruta.InicioSesion.ruta) {
+                            popUpTo(0) { inclusive = true }
                         }
                     }
                 )
@@ -146,20 +113,14 @@ fun NavegacionApp() {
                     },
                     alEliminar = { id ->
                         alcanceCorrutina.launch {
-                            if (!dependencias.mascotas.deletePet(id)) {
-                                errorOperacion = "No se pudo eliminar la mascota"
-                                return@launch
-                            }
+                            RepositorioMascotasAppwrite.deletePet(id)
                             modeloCatalogo.cargarMascotas()
                             controladorNavegacion.popBackStack()
                         }
                     },
                     alMarcarAdoptada = { id ->
                         alcanceCorrutina.launch {
-                            if (!dependencias.mascotas.markAsAdopted(id)) {
-                                errorOperacion = "No se pudo marcar la mascota como adoptada"
-                                return@launch
-                            }
+                            RepositorioMascotasAppwrite.markAsAdopted(id)
                             modeloCatalogo.cargarMascotas()
                             controladorNavegacion.popBackStack()
                         }
@@ -244,13 +205,6 @@ fun NavegacionApp() {
                     alVolver = { controladorNavegacion.popBackStack() },
                     alIrACitas = {
                         controladorNavegacion.navigate(Ruta.Citas.ruta)
-                    },
-                    alAbrirChat = { solicitud ->
-                        val destinatario = if (usuarioActual?.id == solicitud.applicantId)
-                            solicitud.shelterName else solicitud.applicantName
-                        controladorNavegacion.navigate(Ruta.Chat.crearRuta(
-                            "${solicitud.petId}_${solicitud.applicantId}", solicitud.petName, destinatario
-                        ))
                     }
                 )
             }
@@ -269,12 +223,13 @@ fun NavegacionApp() {
                 PantallaPerfil(
                     usuarioActual = usuarioActual,
                     alActualizarUsuario = { actualizado ->
-                        dependencias.autenticacion.usuarioActual.value = actualizado
+                        usuarioActual = actualizado
                     },
                     alVolver = { controladorNavegacion.popBackStack() },
                     alCerrarSesion = {
-                        alcanceCorrutina.launch {
-                            if (!dependencias.autenticacion.logout()) errorOperacion = "No se pudo cerrar la sesión en Appwrite. Revisa tu conexión."
+                        usuarioActual = null
+                        controladorNavegacion.navigate(Ruta.InicioSesion.ruta) {
+                            popUpTo(0) { inclusive = true }
                         }
                     },
                     alHacerClicMascota = { idMascota ->

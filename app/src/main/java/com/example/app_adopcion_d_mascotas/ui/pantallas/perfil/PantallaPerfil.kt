@@ -40,7 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.app_adopcion_d_mascotas.di.modeloVista as viewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.app_adopcion_d_mascotas.datos.modelos.AdoptionRequest
 import com.example.app_adopcion_d_mascotas.datos.modelos.Mascota
@@ -314,7 +314,7 @@ fun ProfileScreen(
                             TarjetaSolicitudAdoptante(
                                 request = solicitud,
                                 onChatClick = {
-                                    onChatClick("${solicitud.petId}_${solicitud.applicantId}", solicitud.shelterName)
+                                    onChatClick("chat_${solicitud.petId}_${solicitud.applicantId}", solicitud.shelterName)
                                 }
                             )
                         }

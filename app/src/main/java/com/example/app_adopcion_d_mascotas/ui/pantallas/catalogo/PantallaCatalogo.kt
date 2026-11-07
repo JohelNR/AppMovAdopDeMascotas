@@ -102,10 +102,6 @@ fun PantallaCatalogo(
                 .padding(paddingValues)
         ) {
             // RF6: Barra de Búsqueda por texto (Nombre, Raza o Refugio)
-            modeloCatalogo.mensajeError?.let { error ->
-                Text(error, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp))
-                TextButton(onClick = { modeloCatalogo.cargarMascotas() }) { Text("Reintentar") }
-            }
             OutlinedTextField(
                 value = modeloCatalogo.textoBusqueda,
                 onValueChange = { modeloCatalogo.textoBusqueda = it },

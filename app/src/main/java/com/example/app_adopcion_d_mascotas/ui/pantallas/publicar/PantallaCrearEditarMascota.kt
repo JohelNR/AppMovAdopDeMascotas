@@ -28,7 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.app_adopcion_d_mascotas.di.modeloVista as viewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.app_adopcion_d_mascotas.datos.modelos.Mascota
 import com.example.app_adopcion_d_mascotas.datos.modelos.Pet
@@ -60,8 +60,6 @@ fun PantallaCrearEditarMascota(
     var nombreRefugio by remember { mutableStateOf(mascotaExistente?.shelterName ?: usuarioActual?.name ?: "Refugio") }
     var descripcion by remember { mutableStateOf(mascotaExistente?.description ?: "") }
     var esUrgente by remember { mutableStateOf(mascotaExistente?.isUrgent ?: false) }
-    var latitud by remember { mutableStateOf(mascotaExistente?.latitude?.toString() ?: "") }
-    var longitud by remember { mutableStateOf(mascotaExistente?.longitude?.toString() ?: "") }
 
     // RF3: Selector oficial de fotos para hasta 5 fotos reales
     val selectorFotosLauncher = rememberLauncherForActivityResult(
@@ -243,17 +241,6 @@ fun PantallaCrearEditarMascota(
             )
 
             OutlinedTextField(
-                value = latitud, onValueChange = { latitud = it },
-                label = { Text("Latitud del refugio (ej. -12.0464)") },
-                singleLine = true, modifier = Modifier.fillMaxWidth()
-            )
-            OutlinedTextField(
-                value = longitud, onValueChange = { longitud = it },
-                label = { Text("Longitud del refugio (ej. -77.0428)") },
-                singleLine = true, modifier = Modifier.fillMaxWidth()
-            )
-
-            OutlinedTextField(
                 value = nombreRefugio,
                 onValueChange = { nombreRefugio = it },
                 label = { Text("Nombre del Refugio responsable *") },
@@ -304,7 +291,7 @@ fun PantallaCrearEditarMascota(
             // BOTÓN GUARDAR
             Button(
                 onClick = {
-                    val edad = textoEdad.toIntOrNull() ?: 0
+                    val edad = textoEdad.toIntOrNull() ?: 1
                     modeloPublicar.guardarMascota(
                         contexto = contexto,
                         mascotaExistente = mascotaExistente,
@@ -318,9 +305,7 @@ fun PantallaCrearEditarMascota(
                         sexo = sexo,
                         tamano = tamano,
                         ubicacion = ubicacion,
-                        alTenerExito = alGuardarExitosamente,
-                        latitud = latitud.toDoubleOrNull() ?: Double.NaN,
-                        longitud = longitud.toDoubleOrNull() ?: Double.NaN
+                        alTenerExito = alGuardarExitosamente
                     )
                 },
                 enabled = !modeloPublicar.estaGuardando,

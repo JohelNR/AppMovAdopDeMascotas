@@ -20,14 +20,8 @@ import com.example.app_adopcion_d_mascotas.datos.repositorios.RepositorioAutenti
 import com.example.app_adopcion_d_mascotas.datos.repositorios.RepositorioMascotasAppwrite
 import com.example.app_adopcion_d_mascotas.datos.repositorios.RepositorioSolicitudesAppwrite
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.CancellationException
 
-class ModeloPerfil(
-    private val RepositorioAlmacenamientoAppwrite: RepositorioAlmacenamientoAppwrite,
-    private val RepositorioAutenticacionAppwrite: RepositorioAutenticacionAppwrite,
-    private val RepositorioMascotasAppwrite: RepositorioMascotasAppwrite,
-    private val RepositorioSolicitudesAppwrite: RepositorioSolicitudesAppwrite
-) : ViewModel() {
+class ModeloPerfil : ViewModel() {
 
     var usuarioActual by mutableStateOf<Usuario?>(null)
         private set
@@ -68,19 +62,13 @@ class ModeloPerfil(
         if (usuario == null) return
 
         viewModelScope.launch {
-            try {
             if (usuario.role == RolUsuario.REFUGIO) {
                 val todasMascotas = RepositorioMascotasAppwrite.getPets()
-                misMascotas = todasMascotas.filter {
-                    it.shelterName.trim().equals(usuario.name.trim(), ignoreCase = true)
+                misMascotas = todasMascotas.filter { 
+                    it.shelterName.trim().equals(usuario.name.trim(), ignoreCase = true) 
                 }
             } else {
                 misSolicitudes = RepositorioSolicitudesAppwrite.getRequestsForApplicant(usuario.id)
-            }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                mensajeEstado = "No se pudo cargar el perfil: ${e.message}"
             }
         }
     }
@@ -120,10 +108,6 @@ class ModeloPerfil(
                 val idSubido = RepositorioAlmacenamientoAppwrite.uploadPhoto(contexto, uri)
                 if (idSubido != null) {
                     idFotoAvatar = idSubido
-                } else {
-                    estaGuardando = false
-                    mensajeEstado = "No se pudo subir el avatar"
-                    return@launch
                 }
             }
 
@@ -139,7 +123,6 @@ class ModeloPerfil(
             resultado.fold(
                 onSuccess = { actualizado ->
                     usuarioActual = actualizado
-                    uriAvatarSeleccionado = null
                     mensajeEstado = "¡Perfil actualizado con éxito!"
                     alTenerExito(actualizado)
                 },

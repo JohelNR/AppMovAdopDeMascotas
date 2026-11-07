@@ -11,7 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.withContext
 
-class RepositorioAutenticacionAppwrite(private val ClienteAppwrite: ClienteAppwrite) {
+object RepositorioAutenticacionAppwrite {
 
     val usuarioActual = MutableStateFlow<Usuario?>(null)
     val currentUser get() = usuarioActual
@@ -25,8 +25,8 @@ class RepositorioAutenticacionAppwrite(private val ClienteAppwrite: ClienteAppwr
                 collectionId = ClienteAppwrite.USERS_COLLECTION,
                 queries = listOf(Query.equal("userId", accountUser.id))
             )
-            val doc = response.documents.firstOrNull() ?: error("No existe el perfil de esta cuenta")
-            val data = doc.data
+            val doc = response.documents.firstOrNull()
+            val data = doc?.data ?: emptyMap()
             val roleStr = data["role"]?.toString() ?: "ADOPTANTE"
             val userRole = if (roleStr.equals("REFUGIO", ignoreCase = true)) RolUsuario.REFUGIO else RolUsuario.ADOPTANTE
 
@@ -42,21 +42,11 @@ class RepositorioAutenticacionAppwrite(private val ClienteAppwrite: ClienteAppwr
             usuarioActual.value = user
             user
         } catch (e: Exception) {
-            usuarioActual.value = null
             null
         }
     }
 
     suspend fun obtenerUsuarioActual(): Usuario? = getCurrentUser()
-
-    suspend fun buscarIdUsuario(nombre: String): String {
-        val usuarios = ClienteAppwrite.databases.listDocuments(
-            ClienteAppwrite.DATABASE_ID, ClienteAppwrite.USERS_COLLECTION,
-            listOf(Query.equal("name", nombre.trim()))
-        ).documents
-        check(usuarios.size == 1) { "El destinatario no existe o su nombre es ambiguo" }
-        return usuarios.single().data["userId"]?.toString().orEmpty()
-    }
 
     suspend fun login(email: String, password: String): Result<Usuario> = withContext(Dispatchers.IO) {
         try {
@@ -111,7 +101,6 @@ class RepositorioAutenticacionAppwrite(private val ClienteAppwrite: ClienteAppwr
                 email = email.trim(),
                 role = role
             )
-            usuarioActual.value = createdUser
             Result.success(createdUser)
         } catch (e: Exception) {
             Result.failure(e)
@@ -131,7 +120,9 @@ class RepositorioAutenticacionAppwrite(private val ClienteAppwrite: ClienteAppwr
     ): Result<Usuario> = withContext(Dispatchers.IO) {
         try {
             // Actualizamos en la cuenta de Appwrite
-            ClienteAppwrite.account.updateName(name.trim())
+            try {
+                ClienteAppwrite.account.updateName(name.trim())
+            } catch (_: Exception) {}
 
             // Buscamos el documento en la colección de usuarios
             val response = ClienteAppwrite.databases.listDocuments(
@@ -166,7 +157,14 @@ class RepositorioAutenticacionAppwrite(private val ClienteAppwrite: ClienteAppwr
                 )
             }
 
-            val updatedUser = getCurrentUser() ?: error("No se pudo recuperar el perfil actualizado")
+            val updatedUser = getCurrentUser() ?: Usuario(
+                id = userId,
+                name = name.trim(),
+                email = "",
+                phone = phone.trim(),
+                bio = bio.trim(),
+                avatarPhotoId = avatarPhotoId
+            )
             Result.success(updatedUser)
         } catch (e: Exception) {
             Result.failure(e)
@@ -181,18 +179,12 @@ class RepositorioAutenticacionAppwrite(private val ClienteAppwrite: ClienteAppwr
         idFotoAvatar: String
     ): Result<Usuario> = updateProfile(idUsuario, nombre, telefono, biografia, idFotoAvatar)
 
-    suspend fun logout(): Boolean = withContext(Dispatchers.IO) {
+    suspend fun logout() = withContext(Dispatchers.IO) {
+        usuarioActual.value = null
         try {
             ClienteAppwrite.account.deleteSession("current")
-            usuarioActual.value = null
-            true
         } catch (e: Exception) {
-            if (e is io.appwrite.exceptions.AppwriteException && e.code == 401) {
-                usuarioActual.value = null
-                true
-            } else {
-                false
-            }
+            e.printStackTrace()
         }
     }
 

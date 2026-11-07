@@ -1,33 +1,29 @@
-# Validación de la migración
+# Validación de la sincronización
 
-## Comprobaciones automatizadas
+## Comprobación de identidad con el ZIP
 
-```powershell
-.\gradlew.bat :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --console=plain
-git diff --check
+```bash
+diff -rq --strip-trailing-cr --exclude=.git --exclude=.idea --exclude=docs \
+  --exclude=build --exclude=.gradle --exclude=local.properties \
+  APP_Mascota_Prueva/ AppMovAdopDeMascotas/
 ```
 
-`RecordatoriosTest` cubre fechas imposibles, años bisiestos, horas inválidas y conversión a la zona horaria local. Las pruebas de compilación/lint no comprueban permisos ni contenido del servidor Appwrite.
+Resultado esperado: sin salida, es decir, idéntico al ZIP. Se verificó al preparar esta rama.
 
-### Resultado local — 6 de noviembre de 2026
+## Compilación
 
-- `assembleDebug`: correcto; APK generado en `app/build/outputs/apk/debug/app-debug.apk`.
-- `testDebugUnitTest`: 3 pruebas, 0 fallos y 0 errores (incluye la prueba básica preexistente).
-- `lintDebug`: correcto, sin errores; permanecen 21 advertencias de dependencias, recursos y estilo/compatibilidad, incluyendo avisos en el SDK de Appwrite.
-- `git diff --check`: sin errores de espacios.
-- Se corrigió el estado del marcador de Maps para conservarlo con `remember` entre recomposiciones.
+```powershell
+.\gradlew.bat :app:assembleDebug :app:testDebugUnitTest --console=plain
+```
 
-## Recorrido con dos cuentas reales
+El ZIP incluía la carpeta `build/` del compañero con clases y DEX compilados del 6 de noviembre de 2026, lo que indica que compiló en su equipo con esta misma configuración (AGP 9.5.0, Gradle 9.6.0). La compilación no se ejecutó en el entorno de esta sincronización porque no tiene el SDK de Android.
 
-1. Registrar adoptante y refugio, cerrar sesión y entrar con cada cuenta. Reabrir y rotar la app: conservar la sesión y volver al flujo correcto.
-2. Editar perfil/avatar; comprobar los cambios al volver al catálogo. Cortar Internet durante la subida y comprobar que se informa error.
-3. Con refugio, crear mascota con coordenadas y fotos, editarla, filtrar catálogo y abrir detalle/mapa. Probar más de cinco fotos y coordenadas inválidas.
-4. Con adoptante, enviar solicitud. Con refugio, verificar que aparece únicamente en su panel y que aceptar marca la mascota adoptada.
-5. Abrir chat desde detalle, perfil y solicitud: comprobar que todos usan la misma conversación. Enviar desde ambas cuentas; verificar una sola burbuja por documento y conservación del texto ante fallo de envío.
-6. Crear seguimiento con fotos y notas; reabrir la pantalla y comprobar persistencia. Repetir sin conectividad y verificar error.
-7. Agendar cita futura y comprobar el recordatorio en la fecha indicada. Probar fecha inválida, notificaciones denegadas y alarmas exactas no autorizadas.
-8. Cerrar sesión y entrar con otra cuenta: verificar que no se muestran solicitudes/citas de la sesión anterior.
+## Recorrido manual
 
-## Requisitos de pruebas de integración
-
-Se necesita un emulador/dispositivo conectado y acceso a Appwrite con las colecciones de `APPWRITE.md`. Durante esta migración no había dispositivos disponibles en `adb devices`; no se han ejecutado pruebas instrumentadas ni operaciones reales con cuentas del usuario. La clave de Maps y el esquema/permisos remotos requieren configuración y validación del propietario.
+1. Login: se ven "Continuar con Google" y "Acceso Rápido de Prueba (Demo)" con los botones Entrar Adoptante y Entrar Refugio.
+2. Registro con correo real, cierre de sesión y nuevo login.
+3. Catálogo: con la colección vacía se crean las mascotas de ejemplo; los filtros funcionan.
+4. Detalle → solicitud → aceptar desde el refugio → la mascota pasa a ADOPTADA.
+5. Agendar cita → llega una notificación unos 10 segundos después.
+6. Chat → llega la respuesta automática del refugio a los 2 segundos.
+7. Seguimiento con fotos.

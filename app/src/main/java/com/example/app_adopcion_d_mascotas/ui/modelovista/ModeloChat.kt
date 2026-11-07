@@ -2,99 +2,129 @@ package com.example.app_adopcion_d_mascotas.ui.modelovista
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.app_adopcion_d_mascotas.datos.modelos.ChatMessage
 import com.example.app_adopcion_d_mascotas.datos.modelos.MensajeChat
 import com.example.app_adopcion_d_mascotas.datos.repositorios.RepositorioAutenticacionAppwrite
 import com.example.app_adopcion_d_mascotas.datos.repositorios.RepositorioChatAppwrite
-import io.appwrite.ID
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class ModeloChat(
-    private val autenticacion: RepositorioAutenticacionAppwrite,
-    private val chat: RepositorioChatAppwrite
-) : ViewModel() {
+// RF13: ViewModel para gestión del Chat en tiempo real
+class ModeloChat : ViewModel() {
+
     private val _mensajes = MutableStateFlow<List<MensajeChat>>(emptyList())
-    val listaMensajes = _mensajes.asStateFlow()
-    private val _texto = MutableStateFlow("")
-    val textoEntrada = _texto.asStateFlow()
-    private val _cargando = MutableStateFlow(false)
-    val estaCargando = _cargando.asStateFlow()
-    private val _error = MutableStateFlow<String?>(null)
-    val mensajeError = _error.asStateFlow()
-    private var idChat = ""
-    private var nombreMascota = ""
-    private var idDestinatario = ""
-    private var enviando = false
-    private var carga: Job? = null
-    private var suscripcion: AutoCloseable? = null
+    val listaMensajes: StateFlow<List<MensajeChat>> = _mensajes.asStateFlow()
+
+    private val _textoEntrada = MutableStateFlow("")
+    val textoEntrada: StateFlow<String> = _textoEntrada.asStateFlow()
+
+    private val _estaCargando = MutableStateFlow(false)
+    val estaCargando: StateFlow<Boolean> = _estaCargando.asStateFlow()
+
+    // Compatibilidad en inglés
+    val messages: StateFlow<List<MensajeChat>> get() = listaMensajes
+    val inputText: StateFlow<String> get() = textoEntrada
+    val isLoading: StateFlow<Boolean> get() = estaCargando
+
+    private var currentChatId: String = ""
+    private var currentPetName: String = ""
+    private var currentReceiverName: String = "Refugio"
+    private var currentReceiverId: String = ""
+    private var realtimeSubscription: AutoCloseable? = null
 
     fun inicializarChat(idChat: String, nombreMascota: String, nombreDestinatario: String = "Refugio", idDestinatario: String = "") {
-        carga?.cancel()
-        suscripcion?.close()
-        this.idChat = idChat
-        this.nombreMascota = nombreMascota
-        this.idDestinatario = idDestinatario
-        _mensajes.value = emptyList()
-        _error.value = null
-        carga = viewModelScope.launch {
-            _cargando.value = true
-            try {
-                if (this@ModeloChat.idDestinatario.isBlank()) {
-                    this@ModeloChat.idDestinatario = autenticacion.buscarIdUsuario(nombreDestinatario)
-                }
-                suscripcion = chat.subscribeToChat(idChat) { mensaje ->
-                    _mensajes.update { (it + mensaje).distinctBy { m -> m.id }.sortedBy { m -> m.timestamp } }
-                }
-                val historial = chat.getMessages(idChat)
-                _mensajes.update { (historial + it).distinctBy { m -> m.id }.sortedBy { m -> m.timestamp } }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                _error.value = "No se pudo cargar el chat: ${e.message}"
-            } finally {
-                _cargando.value = false
+        currentChatId = idChat
+        currentPetName = nombreMascota
+        currentReceiverName = nombreDestinatario
+        currentReceiverId = idDestinatario
+
+        cargarMensajes()
+        configurarTiempoReal()
+    }
+
+    fun initChat(chatId: String, petName: String, receiverName: String = "Refugio", receiverId: String = "") =
+        inicializarChat(chatId, petName, receiverName, receiverId)
+
+    fun cambiarTextoMensaje(nuevoTexto: String) {
+        _textoEntrada.value = nuevoTexto
+    }
+
+    fun onInputTextChanged(text: String) = cambiarTextoMensaje(text)
+
+    private fun cargarMensajes() {
+        viewModelScope.launch {
+            _estaCargando.value = true
+            val lista = RepositorioChatAppwrite.getMessages(currentChatId, currentPetName)
+            _mensajes.value = lista
+            _estaCargando.value = false
+        }
+    }
+
+    private fun configurarTiempoReal() {
+        realtimeSubscription?.close()
+        realtimeSubscription = RepositorioChatAppwrite.subscribeToChat(currentChatId) { nuevoMensaje ->
+            val actual = _mensajes.value
+            if (actual.none { it.id == nuevoMensaje.id }) {
+                _mensajes.value = actual + nuevoMensaje
             }
         }
     }
 
-    fun cambiarTextoMensaje(texto: String) { _texto.value = texto }
-    fun onInputTextChanged(text: String) = cambiarTextoMensaje(text)
     fun enviarMensaje() {
-        val usuario = autenticacion.usuarioActual.value ?: return
-        val texto = _texto.value.trim()
-        if (texto.isEmpty() || idChat.isBlank() || enviando || _cargando.value) return
-        if (idDestinatario.isBlank()) {
-            _error.value = "No se encontró el destinatario en Appwrite."
-            return
-        }
-        val mensaje = MensajeChat(
-            id = ID.unique(), chatId = idChat, petName = nombreMascota,
-            senderId = usuario.id, senderName = usuario.name, receiverId = idDestinatario,
-            text = texto, timestamp = System.currentTimeMillis(), isRead = false
+        val texto = _textoEntrada.value.trim()
+        if (texto.isEmpty() || currentChatId.isEmpty()) return
+
+        val usuarioActual = RepositorioAutenticacionAppwrite.usuarioActual.value
+        val idRemitente = usuarioActual?.id ?: "user_me"
+        val nombreRemitente = usuarioActual?.name ?: "Adoptante"
+
+        val nuevoMensaje = MensajeChat(
+            id = "msg_${System.currentTimeMillis()}",
+            chatId = currentChatId,
+            petName = currentPetName,
+            senderId = idRemitente,
+            senderName = nombreRemitente,
+            receiverId = currentReceiverId.ifEmpty { "shelter_host" },
+            text = texto,
+            timestamp = System.currentTimeMillis(),
+            isRead = false
         )
-        enviando = true
+
+        _textoEntrada.value = ""
+        _mensajes.value = _mensajes.value + nuevoMensaje
+
         viewModelScope.launch {
-            try {
-                chat.sendMessage(mensaje)
-                _mensajes.update { (it + mensaje).distinctBy { m -> m.id }.sortedBy { m -> m.timestamp } }
-                if (_texto.value.trim() == texto) _texto.value = ""
-                _error.value = null
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                _error.value = "No se pudo enviar el mensaje: ${e.message}"
-            } finally {
-                enviando = false
+            RepositorioChatAppwrite.sendMessage(nuevoMensaje)
+
+            // Simular respuesta automática amigable si responde el refugio
+            if (idRemitente != "shelter_host") {
+                delay(2000)
+                val respuesta = MensajeChat(
+                    id = "reply_${System.currentTimeMillis()}",
+                    chatId = currentChatId,
+                    petName = currentPetName,
+                    senderId = "shelter_host",
+                    senderName = currentReceiverName,
+                    receiverId = idRemitente,
+                    text = "¡Recibido! Estamos encantados de coordinar contigo. Por favor agenda también una cita desde la app para tener tu espacio reservado 🐶.",
+                    timestamp = System.currentTimeMillis(),
+                    isRead = true
+                )
+                RepositorioChatAppwrite.sendMessage(respuesta)
+                _mensajes.value = _mensajes.value + respuesta
             }
         }
     }
 
     fun sendMessage() = enviarMensaje()
-    override fun onCleared() { suscripcion?.close() }
+
+    override fun onCleared() {
+        super.onCleared()
+        realtimeSubscription?.close()
+    }
 }
 
 typealias ChatViewModel = ModeloChat

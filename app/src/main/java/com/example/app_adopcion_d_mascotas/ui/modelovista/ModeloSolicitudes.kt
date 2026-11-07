@@ -20,9 +20,8 @@ import com.example.app_adopcion_d_mascotas.datos.modelos.Usuario
 import com.example.app_adopcion_d_mascotas.datos.repositorios.RepositorioSolicitudesAppwrite
 import com.example.app_adopcion_d_mascotas.notificaciones.AyudanteNotificaciones
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.cancelChildren
 
-class ModeloSolicitudes(private val RepositorioSolicitudesAppwrite: RepositorioSolicitudesAppwrite) : ViewModel() {
+class ModeloSolicitudes : ViewModel() {
 
     var listaSolicitudes by mutableStateOf<List<SolicitudAdopcion>>(emptyList())
         private set
@@ -34,14 +33,6 @@ class ModeloSolicitudes(private val RepositorioSolicitudesAppwrite: RepositorioS
         private set
 
     var mensajeRespuesta by mutableStateOf<String?>(null)
-
-    fun limpiarSesion() {
-        viewModelScope.coroutineContext.cancelChildren()
-        listaSolicitudes = emptyList()
-        listaCitas = emptyList()
-        mensajeRespuesta = null
-        estaCargando = false
-    }
 
     // Alias para compatibilidad
     var requestsList: List<SolicitudAdopcion>
@@ -222,11 +213,6 @@ class ModeloSolicitudes(private val RepositorioSolicitudesAppwrite: RepositorioS
     ) {
         if (fecha.isBlank() || hora.isBlank()) {
             mensajeRespuesta = "Por favor ingresa fecha y hora de la cita"
-            return
-        }
-        val instante = AyudanteNotificaciones.fechaHoraMillis(fecha, hora)
-        if (instante == null || instante <= System.currentTimeMillis()) {
-            mensajeRespuesta = "Ingresa una fecha futura (dd/MM/aaaa) y hora (HH:mm) válidas"
             return
         }
 

@@ -9,7 +9,7 @@ import io.appwrite.ID
 import io.appwrite.Query
 import io.appwrite.models.Document
 
-class RepositorioMascotasAppwrite(private val ClienteAppwrite: ClienteAppwrite) {
+object RepositorioMascotasAppwrite {
 
     suspend fun getPets(): List<Mascota> {
         return try {
@@ -22,7 +22,8 @@ class RepositorioMascotasAppwrite(private val ClienteAppwrite: ClienteAppwrite) 
             )
             response.documents.map { docToPet(it) }
         } catch (e: Exception) {
-            throw e
+            e.printStackTrace()
+            emptyList()
         }
     }
 
@@ -43,9 +44,7 @@ class RepositorioMascotasAppwrite(private val ClienteAppwrite: ClienteAppwrite) 
                 "gender" to pet.gender,
                 "size" to pet.size,
                 "location" to pet.location,
-                "photos" to pet.photos,
-                "latitude" to pet.latitude,
-                "longitude" to pet.longitude
+                "photos" to pet.photos
             )
             ClienteAppwrite.databases.createDocument(
                 databaseId = ClienteAppwrite.DATABASE_ID,
@@ -76,9 +75,7 @@ class RepositorioMascotasAppwrite(private val ClienteAppwrite: ClienteAppwrite) 
                 "gender" to pet.gender,
                 "size" to pet.size,
                 "location" to pet.location,
-                "photos" to pet.photos,
-                "latitude" to pet.latitude,
-                "longitude" to pet.longitude
+                "photos" to pet.photos
             )
             ClienteAppwrite.databases.updateDocument(
                 databaseId = ClienteAppwrite.DATABASE_ID,
@@ -151,9 +148,7 @@ class RepositorioMascotasAppwrite(private val ClienteAppwrite: ClienteAppwrite) 
             gender = data["gender"]?.toString() ?: "Macho",
             size = data["size"]?.toString() ?: "Mediano",
             location = data["location"]?.toString() ?: "Lima",
-            photos = photosList,
-            latitude = (data["latitude"] as? Number)?.toDouble() ?: -12.0464,
-            longitude = (data["longitude"] as? Number)?.toDouble() ?: -77.0428
+            photos = photosList
         )
     }
 }

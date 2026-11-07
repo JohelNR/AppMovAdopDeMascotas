@@ -14,10 +14,7 @@ import com.example.app_adopcion_d_mascotas.datos.repositorios.RepositorioAlmacen
 import com.example.app_adopcion_d_mascotas.datos.repositorios.RepositorioMascotasAppwrite
 import kotlinx.coroutines.launch
 
-class ModeloPublicar(
-    private val RepositorioAlmacenamientoAppwrite: RepositorioAlmacenamientoAppwrite,
-    private val RepositorioMascotasAppwrite: RepositorioMascotasAppwrite
-) : ViewModel() {
+class ModeloPublicar : ViewModel() {
 
     var estaGuardando by mutableStateOf(false)
         private set
@@ -69,9 +66,7 @@ class ModeloPublicar(
         sexo: String,
         tamano: String,
         ubicacion: String,
-        alTenerExito: () -> Unit,
-        latitud: Double = mascotaExistente?.latitude ?: -12.0464,
-        longitud: Double = mascotaExistente?.longitude ?: -77.0428
+        alTenerExito: () -> Unit
     ) {
         if (nombre.isBlank() || raza.isBlank() || descripcion.isBlank()) {
             mensajeEstado = "Por favor completa el nombre, raza y descripción"
@@ -82,15 +77,6 @@ class ModeloPublicar(
             return
         }
 
-        if (!latitud.isFinite() || !longitud.isFinite() || latitud !in -90.0..90.0 || longitud !in -180.0..180.0) {
-            mensajeEstado = "Ingresa coordenadas válidas para el refugio"
-            return
-        }
-        if ((mascotaExistente?.photos?.size ?: 0) + fotosSeleccionadas.size > 5) {
-            mensajeEstado = "El total de fotos existentes y nuevas no puede superar 5"
-            return
-        }
-        if (estaGuardando) return
         viewModelScope.launch {
             estaGuardando = true
             mensajeEstado = "Subiendo fotos a la nube..."
@@ -106,10 +92,6 @@ class ModeloPublicar(
                 val idArchivo = RepositorioAlmacenamientoAppwrite.uploadPhoto(contexto, uri)
                 if (idArchivo != null) {
                     idsArchivosSubidos.add(idArchivo)
-                } else {
-                    estaGuardando = false
-                    mensajeEstado = "No se pudo subir una foto; la publicación no se guardó"
-                    return@launch
                 }
             }
 
@@ -127,9 +109,7 @@ class ModeloPublicar(
                     gender = sexo,
                     size = tamano,
                     location = ubicacion,
-                    photos = idsArchivosSubidos,
-                    latitude = latitud,
-                    longitude = longitud
+                    photos = idsArchivosSubidos
                 )
             } else {
                 Mascota(
@@ -144,9 +124,7 @@ class ModeloPublicar(
                     gender = sexo,
                     size = tamano,
                     location = ubicacion,
-                    photos = idsArchivosSubidos,
-                    latitude = latitud,
-                    longitude = longitud
+                    photos = idsArchivosSubidos
                 )
             }
 
