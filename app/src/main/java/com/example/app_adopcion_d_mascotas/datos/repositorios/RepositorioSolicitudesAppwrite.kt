@@ -15,10 +15,7 @@ import io.appwrite.models.Document
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class RepositorioSolicitudesAppwrite(
-    private val ClienteAppwrite: ClienteAppwrite,
-    private val RepositorioMascotasAppwrite: RepositorioMascotasAppwrite
-) {
+object RepositorioSolicitudesAppwrite {
 
     // RF8: Enviar formulario de solicitud
     suspend fun createRequest(request: SolicitudAdopcion): Boolean = withContext(Dispatchers.IO) {
@@ -64,12 +61,14 @@ class RepositorioSolicitudesAppwrite(
             val cleanTarget = shelterName.trim()
             val allRequests = response.documents.map { docToRequest(it) }
             if (cleanTarget.isNotBlank()) {
-                val filtered = allRequests.filter {
-                    it.shelterName.trim().equals(cleanTarget, ignoreCase = true)
+                val filtered = allRequests.filter { 
+                    it.shelterName.trim().equals(cleanTarget, ignoreCase = true) ||
+                    cleanTarget.contains(it.shelterName.trim(), ignoreCase = true) ||
+                    it.shelterName.trim().contains(cleanTarget, ignoreCase = true)
                 }
-                filtered
+                if (filtered.isNotEmpty()) filtered else allRequests
             } else {
-                emptyList()
+                allRequests
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -111,7 +110,7 @@ class RepositorioSolicitudesAppwrite(
             )
 
             // 2. Marcar la mascota como ADOPTADA (sale del catálogo)
-            check(RepositorioMascotasAppwrite.markAsAdopted(petId)) { "No se pudo actualizar la mascota" }
+            RepositorioMascotasAppwrite.markAsAdopted(petId)
 
             // 3. Buscar todas las demás solicitudes de esta misma mascota y ponerlas NO_DISPONIBLE
             val otherRequests = ClienteAppwrite.databases.listDocuments(

@@ -18,7 +18,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.app_adopcion_d_mascotas.di.modeloVista as viewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.example.app_adopcion_d_mascotas.datos.modelos.RolUsuario
@@ -198,6 +198,66 @@ fun PantallaInicioSesion(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Text("Acceso con cuenta real de Appwrite", style = MaterialTheme.typography.bodySmall)
+        // Inicio de sesión con Google
+        OutlinedButton(
+            onClick = { modeloAutenticacion.iniciarSesionConGoogle(alIniciarSesion) },
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = "G",
+                    fontWeight = FontWeight.Black,
+                    fontSize = 20.sp,
+                    color = Color(0xFF4285F4)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = "Continuar con Google",
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 15.sp
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        HorizontalDivider()
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = "Acceso Rápido de Prueba (Demo)",
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedButton(
+                onClick = { modeloAutenticacion.accesoRapidoDemo(RolUsuario.ADOPTANTE, alIniciarSesion) },
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Entrar Adoptante", fontSize = 12.sp)
+            }
+
+            OutlinedButton(
+                onClick = { modeloAutenticacion.accesoRapidoDemo(RolUsuario.REFUGIO, alIniciarSesion) },
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Entrar Refugio", fontSize = 12.sp)
+            }
+        }
     }
 }

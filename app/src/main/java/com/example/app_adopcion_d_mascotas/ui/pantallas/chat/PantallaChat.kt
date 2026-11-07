@@ -20,9 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.app_adopcion_d_mascotas.di.modeloVista as viewModel
-import com.example.app_adopcion_d_mascotas.di.contenedorApp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.app_adopcion_d_mascotas.datos.modelos.ChatMessage
 import com.example.app_adopcion_d_mascotas.datos.modelos.MensajeChat
 import com.example.app_adopcion_d_mascotas.datos.repositorios.AppwriteAuthRepository
@@ -59,13 +57,10 @@ fun ChatScreen(
     onBackClick: () -> Unit,
     viewModel: ModeloChat = viewModel()
 ) {
-    val mensajes by viewModel.listaMensajes.collectAsStateWithLifecycle()
-    val textoMensaje by viewModel.textoEntrada.collectAsStateWithLifecycle()
-    val estaCargando by viewModel.estaCargando.collectAsStateWithLifecycle()
-    val usuarioActual by contenedorApp().autenticacion.currentUser.collectAsStateWithLifecycle()
-    val error by viewModel.mensajeError.collectAsStateWithLifecycle()
-    val snackbar = remember { SnackbarHostState() }
-    LaunchedEffect(error) { error?.let { snackbar.showSnackbar(it) } }
+    val mensajes by viewModel.listaMensajes.collectAsState()
+    val textoMensaje by viewModel.textoEntrada.collectAsState()
+    val estaCargando by viewModel.estaCargando.collectAsState()
+    val usuarioActual by AppwriteAuthRepository.currentUser.collectAsState()
 
     val estadoLista = rememberLazyListState()
 
@@ -86,7 +81,6 @@ fun ChatScreen(
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
                 title = {
@@ -120,7 +114,7 @@ fun ChatScreen(
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = if (petName.isNotEmpty()) "Interés en $petName 🐾" else "Conversación",
+                                    text = if (petName.isNotEmpty()) "Interés en $petName 🐾" else "En línea",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -204,7 +198,7 @@ fun ChatScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(mensajes) { mensaje ->
-                        val esMio = mensaje.senderId == usuarioActual?.id
+                        val esMio = mensaje.senderId == (usuarioActual?.id ?: "user_me") || mensaje.senderId != "shelter_host"
                         BurbujaMensaje(message = mensaje, isMe = esMio)
                     }
                 }

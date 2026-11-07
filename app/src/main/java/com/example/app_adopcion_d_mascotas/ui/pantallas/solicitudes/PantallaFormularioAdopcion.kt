@@ -15,7 +15,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.app_adopcion_d_mascotas.di.modeloVista as viewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.app_adopcion_d_mascotas.datos.modelos.Mascota
 import com.example.app_adopcion_d_mascotas.datos.modelos.Pet
 import com.example.app_adopcion_d_mascotas.datos.modelos.User

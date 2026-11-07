@@ -11,16 +11,13 @@ import com.example.app_adopcion_d_mascotas.datos.modelos.Pet
 import com.example.app_adopcion_d_mascotas.datos.modelos.PetStatus
 import com.example.app_adopcion_d_mascotas.datos.repositorios.RepositorioMascotasAppwrite
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.CancellationException
 
-class ModeloCatalogo(private val RepositorioMascotasAppwrite: RepositorioMascotasAppwrite) : ViewModel() {
+class ModeloCatalogo : ViewModel() {
 
     var todasLasMascotas by mutableStateOf<List<Mascota>>(emptyList())
         private set
 
     var estaCargando by mutableStateOf(false)
-        private set
-    var mensajeError by mutableStateOf<String?>(null)
         private set
 
     // RF6: Filtros y Búsqueda combinables
@@ -54,19 +51,15 @@ class ModeloCatalogo(private val RepositorioMascotasAppwrite: RepositorioMascota
     }
 
     fun cargarMascotas() {
-        if (estaCargando) return
         viewModelScope.launch {
             estaCargando = true
-            mensajeError = null
-            try {
-                todasLasMascotas = RepositorioMascotasAppwrite.getPets()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                mensajeError = "No se pudo cargar el catálogo: ${e.message}"
-            } finally {
-                estaCargando = false
+            val mascotasNube = RepositorioMascotasAppwrite.getPets()
+            if (mascotasNube.isEmpty()) {
+                sembrarMascotasIniciales()
+            } else {
+                todasLasMascotas = mascotasNube
             }
+            estaCargando = false
         }
     }
 

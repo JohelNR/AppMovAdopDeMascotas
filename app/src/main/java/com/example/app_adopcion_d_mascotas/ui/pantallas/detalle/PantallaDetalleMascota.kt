@@ -1,7 +1,4 @@
 package com.example.app_adopcion_d_mascotas.ui.pantallas.detalle
-import com.example.app_adopcion_d_mascotas.BuildConfig
-import android.content.ActivityNotFoundException
-import android.widget.Toast
 
 import android.content.Intent
 import android.net.Uri
@@ -75,7 +72,6 @@ fun PantallaDetalleMascota(
     }
 
     val ubicacionMascota = remember(mascota) { LatLng(mascota.latitude, mascota.longitude) }
-    val estadoMarcador = remember(ubicacionMascota) { MarkerState(position = ubicacionMascota) }
     val estadoCamara = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(ubicacionMascota, 14f)
     }
@@ -308,11 +304,7 @@ fun PantallaDetalleMascota(
                         onClick = {
                             val uri = Uri.parse("geo:${mascota.latitude},${mascota.longitude}?q=${mascota.latitude},${mascota.longitude}(${Uri.encode(mascota.shelterName)})")
                             val intent = Intent(Intent.ACTION_VIEW, uri)
-                            try {
-                                contexto.startActivity(intent)
-                            } catch (_: ActivityNotFoundException) {
-                                Toast.makeText(contexto, "No hay una aplicación de mapas instalada", Toast.LENGTH_SHORT).show()
-                            }
+                            contexto.startActivity(intent)
                         },
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                         shape = RoundedCornerShape(8.dp)
@@ -331,14 +323,12 @@ fun PantallaDetalleMascota(
                         .fillMaxWidth()
                         .height(190.dp)
                 ) {
-                    if (!BuildConfig.MAPS_CONFIGURADO) {
-                        Text("Configura MAPS_API_KEY para mostrar el mapa. Puedes usar Cómo llegar.", modifier = Modifier.padding(16.dp))
-                    } else GoogleMap(
+                    GoogleMap(
                         modifier = Modifier.fillMaxSize(),
                         cameraPositionState = estadoCamara
                     ) {
                         Marker(
-                            state = estadoMarcador,
+                            state = MarkerState(position = ubicacionMascota),
                             title = mascota.shelterName,
                             snippet = "Ubicación del refugio para adopción de ${mascota.name}"
                         )

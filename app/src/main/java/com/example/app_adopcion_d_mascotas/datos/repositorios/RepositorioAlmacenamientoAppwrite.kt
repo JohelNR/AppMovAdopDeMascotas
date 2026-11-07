@@ -8,7 +8,7 @@ import io.appwrite.models.InputFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class RepositorioAlmacenamientoAppwrite(private val ClienteAppwrite: ClienteAppwrite) {
+object RepositorioAlmacenamientoAppwrite {
 
     suspend fun uploadPhoto(context: Context, uri: Uri): String? = withContext(Dispatchers.IO) {
         try {

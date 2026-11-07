@@ -43,15 +43,13 @@ fun PantallaSolicitudes(
     modeloSolicitudes: ModeloSolicitudes,
     modeloCatalogo: ModeloCatalogo,
     alVolver: () -> Unit,
-    alIrACitas: () -> Unit,
-    alAbrirChat: (SolicitudAdopcion) -> Unit = {}
+    alIrACitas: () -> Unit
 ) = RequestsScreen(
     currentUser = usuarioActual,
     requestsViewModel = modeloSolicitudes,
     feedViewModel = modeloCatalogo,
     onBackClick = alVolver,
-    onGoToAppointments = alIrACitas,
-    onChatClick = alAbrirChat
+    onGoToAppointments = alIrACitas
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -61,8 +59,7 @@ fun RequestsScreen(
     requestsViewModel: ModeloSolicitudes,
     feedViewModel: ModeloCatalogo,
     onBackClick: () -> Unit,
-    onGoToAppointments: () -> Unit,
-    onChatClick: (SolicitudAdopcion) -> Unit = {}
+    onGoToAppointments: () -> Unit
 ) {
     // Al abrir la pantalla, cargar las solicitudes del usuario actual
     LaunchedEffect(currentUser) {
@@ -179,9 +176,6 @@ fun RequestsScreen(
                             },
                             onScheduleClick = { solicitudPorAgendar = solicitud }
                         )
-                        TextButton(onClick = { onChatClick(solicitud) }) {
-                            Text("Abrir conversación")
-                        }
                     }
                 }
             }

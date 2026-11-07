@@ -16,15 +16,11 @@ import com.example.app_adopcion_d_mascotas.datos.modelos.Usuario
 import com.example.app_adopcion_d_mascotas.datos.repositorios.RepositorioAlmacenamientoAppwrite
 import com.example.app_adopcion_d_mascotas.datos.repositorios.RepositorioSeguimientoAppwrite
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.CancellationException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-class ModeloSeguimiento(
-    private val RepositorioAlmacenamientoAppwrite: RepositorioAlmacenamientoAppwrite,
-    private val RepositorioSeguimientoAppwrite: RepositorioSeguimientoAppwrite
-) : ViewModel() {
+class ModeloSeguimiento : ViewModel() {
 
     var listaSeguimientos by mutableStateOf<List<SeguimientoMascota>>(emptyList())
         private set
@@ -71,15 +67,8 @@ class ModeloSeguimiento(
     fun cargarSeguimientos(idMascota: String) {
         viewModelScope.launch {
             estaCargando = true
-            try {
-                listaSeguimientos = RepositorioSeguimientoAppwrite.getFollowUps(idMascota)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                mensajeEstado = "No se pudo cargar el seguimiento: ${e.message}"
-            } finally {
-                estaCargando = false
-            }
+            listaSeguimientos = RepositorioSeguimientoAppwrite.getFollowUps(idMascota)
+            estaCargando = false
         }
     }
 
@@ -108,10 +97,6 @@ class ModeloSeguimiento(
                 val idArchivo = RepositorioAlmacenamientoAppwrite.uploadPhoto(contexto, uri)
                 if (idArchivo != null) {
                     idsFotosSubidas.add(idArchivo)
-                } else {
-                    estaEnviando = false
-                    mensajeEstado = "No se pudo subir una foto; el reporte no se envió"
-                    return@launch
                 }
             }
 
@@ -128,7 +113,7 @@ class ModeloSeguimiento(
                 healthNotes = notasSalud.trim(),
                 adaptationNotes = notasAdaptacion.trim(),
                 photos = idsFotosSubidas,
-                status = "ENVIADO"
+                status = "REVISADO"
             )
 
             val exito = RepositorioSeguimientoAppwrite.createFollowUp(nuevoReporte)
