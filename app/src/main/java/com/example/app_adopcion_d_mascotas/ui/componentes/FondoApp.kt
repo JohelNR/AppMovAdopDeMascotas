@@ -1,13 +1,15 @@
 package com.example.app_adopcion_d_mascotas.ui.componentes
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pets
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.Dp
@@ -15,6 +17,7 @@ import androidx.compose.ui.unit.dp
 
 /**
  * Fondo decorativo de la app con huellitas semitransparentes dispersas.
+ * Se adapta automáticamente al modo claro y oscuro del sistema.
  */
 @Composable
 fun FondoApp(
@@ -22,7 +25,9 @@ fun FondoApp(
     content: @Composable () -> Unit
 ) {
     Box(
-        modifier = modifier.fillMaxSize()
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
     ) {
         // Capa de huellitas decorativas (no interactivas)
         CapaHuellitas()
@@ -40,6 +45,7 @@ fun AppBackground(
 
 @Composable
 private fun CapaHuellitas() {
+    val esOscuro = isSystemInDarkTheme()
     val paws = listOf(
         DatosHuella(0.08f, 0.05f, -20f, 28.dp, 0.10f),
         DatosHuella(0.80f, 0.03f, 15f,  22.dp, 0.08f),
@@ -64,14 +70,15 @@ private fun CapaHuellitas() {
     Layout(
         content = {
             paws.forEach { paw ->
+                val opacidad = if (esOscuro) paw.opacidad else (paw.opacidad * 0.40f)
                 Icon(
                     imageVector = Icons.Default.Pets,
                     contentDescription = null,
-                    tint = Color(0xFFE65100),
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier
                         .graphicsLayer(
                             rotationZ = paw.rotacion,
-                            alpha = paw.opacidad
+                            alpha = opacidad
                         )
                 )
             }

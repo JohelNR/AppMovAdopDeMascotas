@@ -143,12 +143,17 @@ fun ChatScreen(
                     .fillMaxWidth()
                     .imePadding()
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
                 ) {
+                    Row(
+                        modifier = Modifier
+                            .widthIn(max = 760.dp)
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                     OutlinedTextField(
                         value = textoMensaje,
                         onValueChange = { viewModel.cambiarTextoMensaje(it) },
@@ -180,26 +185,35 @@ fun ChatScreen(
                 }
             }
         }
+    }
     ) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.95f))
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)),
+            contentAlignment = Alignment.TopCenter
         ) {
-            if (estaCargando && mensajes.isEmpty()) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-            } else {
-                LazyColumn(
-                    state = estadoLista,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(mensajes) { mensaje ->
-                        val esMio = mensaje.senderId == (usuarioActual?.id ?: "user_me") || mensaje.senderId != "shelter_host"
-                        BurbujaMensaje(message = mensaje, isMe = esMio)
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .widthIn(max = 760.dp)
+                    .fillMaxWidth()
+            ) {
+                if (estaCargando && mensajes.isEmpty()) {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                } else {
+                    LazyColumn(
+                        state = estadoLista,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(mensajes) { mensaje ->
+                            val esMio = mensaje.senderId == (usuarioActual?.id ?: "user_me") || mensaje.senderId != "shelter_host"
+                            BurbujaMensaje(message = mensaje, isMe = esMio)
+                        }
                     }
                 }
             }

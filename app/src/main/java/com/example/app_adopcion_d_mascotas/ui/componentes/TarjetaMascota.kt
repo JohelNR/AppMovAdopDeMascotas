@@ -1,6 +1,7 @@
 package com.example.app_adopcion_d_mascotas.ui.componentes
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -129,14 +130,27 @@ fun TarjetaMascota(
                         color = MaterialTheme.colorScheme.onSurface
                     )
 
-                    // Chip de sexo (Macho / Hembra)
+                    // Chip de sexo (Macho / Hembra) adaptado a modo oscuro y claro
+                    val esOscuro = isSystemInDarkTheme()
+                    val esHembra = mascota.gender.equals("Hembra", ignoreCase = true)
+                    val fondoChip = if (esOscuro) {
+                        if (esHembra) Color(0xFF4A1E2D) else Color(0xFF102A45)
+                    } else {
+                        if (esHembra) Color(0xFFFCE4EC) else Color(0xFFE3F2FD)
+                    }
+                    val textoChip = if (esOscuro) {
+                        if (esHembra) Color(0xFFFFB2D0) else Color(0xFF90CAF9)
+                    } else {
+                        if (esHembra) Color(0xFFC2185B) else Color(0xFF1976D2)
+                    }
+
                     Surface(
-                        color = if (mascota.gender == "Hembra") Color(0xFFFCE4EC) else Color(0xFFE3F2FD),
+                        color = fondoChip,
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Text(
                             text = mascota.gender,
-                            color = if (mascota.gender == "Hembra") Color(0xFFC2185B) else Color(0xFF1976D2),
+                            color = textoChip,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)

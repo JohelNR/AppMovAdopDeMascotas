@@ -57,14 +57,21 @@ fun PantallaFormularioAdopcion(
             )
         }
     ) { paddingValues ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 20.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(paddingValues),
+            contentAlignment = Alignment.TopCenter
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .widthIn(max = 700.dp)
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
             Spacer(modifier = Modifier.height(4.dp))
 
             // Resumen de la mascota a adoptar
@@ -242,6 +249,7 @@ fun PantallaFormularioAdopcion(
             Spacer(modifier = Modifier.height(24.dp))
         }
     }
+}
 }
 
 // Wrapper para compatibilidad

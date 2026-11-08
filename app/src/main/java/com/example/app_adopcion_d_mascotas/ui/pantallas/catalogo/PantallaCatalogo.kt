@@ -96,11 +96,18 @@ fun PantallaCatalogo(
             }
         }
     ) { paddingValues ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .padding(paddingValues),
+            contentAlignment = Alignment.TopCenter
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .widthIn(max = 840.dp)
+                    .fillMaxWidth()
+            ) {
             // RF6: Barra de Búsqueda por texto (Nombre, Raza o Refugio)
             OutlinedTextField(
                 value = modeloCatalogo.textoBusqueda,
@@ -274,6 +281,7 @@ fun PantallaCatalogo(
             }
         }
     }
+}
 }
 
 // Wrapper para compatibilidad

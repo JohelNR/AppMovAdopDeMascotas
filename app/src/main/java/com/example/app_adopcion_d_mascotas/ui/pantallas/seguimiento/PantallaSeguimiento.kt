@@ -116,8 +116,15 @@ fun FollowUpScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .padding(paddingValues),
+            contentAlignment = Alignment.TopCenter
         ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .widthIn(max = 760.dp)
+                    .fillMaxWidth()
+            ) {
             if (followUpViewModel.estaCargando) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             } else if (followUpViewModel.listaSeguimientos.isEmpty()) {
@@ -160,6 +167,7 @@ fun FollowUpScreen(
             }
         }
     }
+}
 
     if (mostrarDialogoCrear && pet != null && currentUser != null) {
         DialogoCrearSeguimiento(

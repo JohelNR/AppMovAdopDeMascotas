@@ -141,11 +141,18 @@ fun ProfileScreen(
             return@Scaffold
         }
 
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .padding(paddingValues),
+            contentAlignment = Alignment.TopCenter
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .widthIn(max = 760.dp)
+                    .fillMaxWidth()
+            ) {
             // CABECERA ESTILO INSTAGRAM (Avatar circular + Datos)
             Card(
                 modifier = Modifier
@@ -323,6 +330,7 @@ fun ProfileScreen(
             }
         }
     }
+}
 
     // DIÁLOGO MODAL EDITAR PERFIL (Con soporte anti-teclado)
     if (mostrarDialogoEditar && usuario != null) {

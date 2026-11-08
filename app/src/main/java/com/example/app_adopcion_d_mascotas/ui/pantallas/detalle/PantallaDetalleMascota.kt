@@ -103,12 +103,19 @@ fun PantallaDetalleMascota(
             )
         }
     ) { paddingValues ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
+                .padding(paddingValues),
+            contentAlignment = Alignment.TopCenter
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .widthIn(max = 760.dp)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+            ) {
             // RF4: Carrusel de Fotos
             Box(
                 modifier = Modifier
@@ -419,6 +426,7 @@ fun PantallaDetalleMascota(
             }
         }
     }
+}
 
     if (mostrarDialogoEliminar) {
         AlertDialog(

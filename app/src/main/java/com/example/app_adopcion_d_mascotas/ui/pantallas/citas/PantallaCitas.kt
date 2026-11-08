@@ -85,8 +85,15 @@ fun AppointmentsScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .padding(paddingValues),
+            contentAlignment = Alignment.TopCenter
         ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .widthIn(max = 760.dp)
+                    .fillMaxWidth()
+            ) {
             if (estaCargando) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             } else if (listaCitas.isEmpty()) {
@@ -140,6 +147,7 @@ fun AppointmentsScreen(
             }
         }
     }
+}
 }
 
 @Composable

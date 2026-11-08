@@ -40,14 +40,19 @@ fun PantallaInicioSesion(
     var rolSeleccionado by remember { mutableStateOf(RolUsuario.ADOPTANTE) }
     var modoRegistro by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp)
-            .verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
     ) {
+        Column(
+            modifier = Modifier
+                .widthIn(max = 480.dp)
+                .fillMaxWidth()
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
         // Logo de la aplicación
         Surface(
             shape = CircleShape,
@@ -260,4 +265,5 @@ fun PantallaInicioSesion(
             }
         }
     }
+}
 }

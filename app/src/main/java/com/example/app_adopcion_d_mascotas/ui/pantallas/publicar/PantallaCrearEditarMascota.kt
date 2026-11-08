@@ -82,14 +82,21 @@ fun PantallaCrearEditarMascota(
             )
         }
     ) { paddingValues ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 20.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(paddingValues),
+            contentAlignment = Alignment.TopCenter
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .widthIn(max = 700.dp)
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
             Spacer(modifier = Modifier.height(4.dp))
 
             // RF3: SECCIÓN DE FOTOS REALES DE GALERÍA
@@ -333,6 +340,7 @@ fun PantallaCrearEditarMascota(
             Spacer(modifier = Modifier.height(24.dp))
         }
     }
+}
 }
 
 // Wrapper para compatibilidad
