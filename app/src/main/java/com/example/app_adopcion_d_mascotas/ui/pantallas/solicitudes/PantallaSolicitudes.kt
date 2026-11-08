@@ -1,5 +1,7 @@
 package com.example.app_adopcion_d_mascotas.ui.pantallas.solicitudes
 
+import android.app.DatePickerDialog
+import android.app.TimePickerDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -7,11 +9,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Pets
 import androidx.compose.material3.*
@@ -24,19 +27,27 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.app_adopcion_d_mascotas.datos.modelos.AdoptionRequest
-import com.example.app_adopcion_d_mascotas.datos.modelos.EstadoSolicitud
 import com.example.app_adopcion_d_mascotas.datos.modelos.RequestStatus
-import com.example.app_adopcion_d_mascotas.datos.modelos.RolUsuario
-import com.example.app_adopcion_d_mascotas.datos.modelos.SolicitudAdopcion
 import com.example.app_adopcion_d_mascotas.datos.modelos.User
 import com.example.app_adopcion_d_mascotas.datos.modelos.UserRole
 import com.example.app_adopcion_d_mascotas.datos.modelos.Usuario
 import com.example.app_adopcion_d_mascotas.ui.componentes.EstadoVacio
-import com.example.app_adopcion_d_mascotas.ui.modelovista.FeedViewModel
 import com.example.app_adopcion_d_mascotas.ui.modelovista.ModeloCatalogo
 import com.example.app_adopcion_d_mascotas.ui.modelovista.ModeloSolicitudes
-import com.example.app_adopcion_d_mascotas.ui.modelovista.RequestsViewModel
+import java.util.Calendar
+import java.util.Locale
 
+/*
+ * ============================================================================
+ * ARCHIVO: PantallaSolicitudes.kt
+ * CAPA: UI -> Pantallas -> Solicitudes (RF9, RF10, RF13 y RF20)
+ * ¿QUÉ HACE?: Muestra las solicitudes de adopción guardadas en Appwrite Cloud:
+ *             - Si es ADOPTANTE: Ve el estado de sus solicitudes y puede abrir
+ *               el chat en vivo con el refugio.
+ *             - Si es REFUGIO: Puede Chatear con el postulante, Agendar Cita,
+ *               Aprobar en cascada (RF10) o Rechazar.
+ * ============================================================================
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PantallaSolicitudes(
@@ -44,13 +55,15 @@ fun PantallaSolicitudes(
     modeloSolicitudes: ModeloSolicitudes,
     modeloCatalogo: ModeloCatalogo,
     alVolver: () -> Unit,
-    alIrACitas: () -> Unit
+    alIrACitas: () -> Unit,
+    alAbrirChat: (String, String, String) -> Unit = { _, _, _ -> }
 ) = RequestsScreen(
     currentUser = usuarioActual,
     requestsViewModel = modeloSolicitudes,
     feedViewModel = modeloCatalogo,
     onBackClick = alVolver,
-    onGoToAppointments = alIrACitas
+    onGoToAppointments = alIrACitas,
+    onOpenChat = alAbrirChat
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -60,9 +73,10 @@ fun RequestsScreen(
     requestsViewModel: ModeloSolicitudes,
     feedViewModel: ModeloCatalogo,
     onBackClick: () -> Unit,
-    onGoToAppointments: () -> Unit
+    onGoToAppointments: () -> Unit,
+    onOpenChat: (String, String, String) -> Unit = { _, _, _ -> }
 ) {
-    // Al abrir la pantalla, cargar las solicitudes del usuario actual
+    // Paso 1: Cargar las solicitudes desde la tabla "solicitudes" al abrir la pantalla
     LaunchedEffect(currentUser) {
         requestsViewModel.cargarSolicitudes(currentUser)
     }
@@ -72,7 +86,6 @@ fun RequestsScreen(
     val estadoSnackbar = remember { SnackbarHostState() }
     val contexto = LocalContext.current
 
-    // Mostrar feedback si existe
     LaunchedEffect(requestsViewModel.mensajeRespuesta) {
         requestsViewModel.mensajeRespuesta?.let { mensaje ->
             estadoSnackbar.showSnackbar(mensaje)
@@ -80,7 +93,6 @@ fun RequestsScreen(
         }
     }
 
-    // Estados para diálogos
     var solicitudPorAceptar by remember { mutableStateOf<AdoptionRequest?>(null) }
     var solicitudPorAgendar by remember { mutableStateOf<AdoptionRequest?>(null) }
 
@@ -91,12 +103,15 @@ fun RequestsScreen(
                 title = {
                     Column {
                         Text(
-                            text = if (currentUser?.role == UserRole.REFUGIO) "Panel de Solicitudes" else "Mis Solicitudes",
+                            text = if (currentUser?.rol == UserRole.REFUGIO) "Panel de Solicitudes" else "Mis Solicitudes",
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp
                         )
                         Text(
-                            text = if (currentUser?.role == UserRole.REFUGIO) "Refugio: ${currentUser.name}" else "Adoptante: ${currentUser?.name ?: ""}",
+                            text = if (currentUser?.rol == UserRole.REFUGIO)
+                                "Refugio: ${currentUser.nombre}"
+                            else
+                                "Adoptante: ${currentUser?.nombre ?: ""}",
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -131,41 +146,53 @@ fun RequestsScreen(
                     .widthIn(max = 760.dp)
                     .fillMaxWidth()
             ) {
-            if (estaCargando) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-            } else if (solicitudes.isEmpty()) {
-                EstadoVacio(
-                    icono = Icons.Default.Email,
-                    titulo = if (currentUser?.role == UserRole.REFUGIO) "No has recibido solicitudes aún" else "No has enviado solicitudes de adopción aún",
-                    descripcion = if (currentUser?.role == UserRole.REFUGIO)
-                        "Cuando los adoptantes postulen a tus mascotas publicadas, aparecerán aquí."
-                    else
-                        "Explora el catálogo y postula a la mascota que desees acoger en tu hogar."
-                )
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    items(solicitudes, key = { it.id }) { solicitud ->
-                        TarjetaSolicitud(
-                            request = solicitud,
-                            currentUser = currentUser,
-                            onAcceptClick = { solicitudPorAceptar = solicitud },
-                            onRejectClick = {
-                                requestsViewModel.rechazarSolicitud(solicitud.id, currentUser)
-                            },
-                            onScheduleClick = { solicitudPorAgendar = solicitud }
-                        )
+                if (estaCargando) {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                } else if (solicitudes.isEmpty()) {
+                    EstadoVacio(
+                        icono = Icons.Default.Email,
+                        titulo = if (currentUser?.rol == UserRole.REFUGIO)
+                            "No has recibido solicitudes aún"
+                        else
+                            "No has enviado solicitudes de adopción aún",
+                        descripcion = if (currentUser?.rol == UserRole.REFUGIO)
+                            "Cuando los adoptantes postulen a tus mascotas publicadas, aparecerán aquí."
+                        else
+                            "Explora el catálogo y postula a la mascota que desees acoger en tu hogar."
+                    )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        items(solicitudes, key = { it.id }) { solicitud ->
+                            TarjetaSolicitud(
+                                request = solicitud,
+                                currentUser = currentUser,
+                                onAcceptClick = { solicitudPorAceptar = solicitud },
+                                onRejectClick = {
+                                    requestsViewModel.rechazarSolicitud(solicitud.id, currentUser)
+                                },
+                                onScheduleClick = { solicitudPorAgendar = solicitud },
+                                onChatClick = {
+                                    // Canal unificado entre Refugio y Adoptante (RF13)
+                                    val idChatUnificado = "chat_${solicitud.idMascota}_${solicitud.idSolicitante}"
+                                    val destinatario = if (currentUser?.rol == UserRole.REFUGIO)
+                                        solicitud.nombreSolicitante
+                                    else
+                                        solicitud.nombreRefugio
+                                    onOpenChat(idChatUnificado, solicitud.nombreMascota, destinatario)
+                                }
+                            )
+                        }
                     }
                 }
             }
         }
     }
-}
 
-    // DIÁLOGO RF10: Confirmación de Aceptación y Cascada Automática
+    // DIÁLOGO RF10: Confirmar aprobación con efecto en cascada
     solicitudPorAceptar?.let { req ->
         AlertDialog(
             onDismissRequest = { solicitudPorAceptar = null },
@@ -186,7 +213,7 @@ fun RequestsScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "¿Deseas aprobar formalmente la adopción de ${req.petName} a favor de ${req.applicantName}?",
+                        text = "¿Deseas aprobar la adopción de ${req.nombreMascota} a favor de ${req.nombreSolicitante}?",
                         fontWeight = FontWeight.Medium
                     )
                     Card(
@@ -196,10 +223,10 @@ fun RequestsScreen(
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("⚡ Acciones automáticas del sistema:", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            Text("1. La mascota '${req.petName}' pasará a estado ADOPTADA.", fontSize = 12.sp)
-                            Text("2. Se retirará automáticamente del catálogo público.", fontSize = 12.sp)
-                            Text("3. Otras solicitudes pendientes para esta mascota pasarán a 'NO_DISPONIBLE'.", fontSize = 12.sp)
+                            Text("⚡ Acciones automáticas en Appwrite Cloud:", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text("1. '${req.nombreMascota}' pasará a estado ADOPTADA.", fontSize = 12.sp)
+                            Text("2. Se retirará automáticamente del catálogo disponible.", fontSize = 12.sp)
+                            Text("3. Otras solicitudes pendientes pasarán a 'NO_DISPONIBLE'.", fontSize = 12.sp)
                         }
                     }
                 }
@@ -207,10 +234,10 @@ fun RequestsScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        val toAccept = req
+                        val aAceptar = req
                         solicitudPorAceptar = null
-                        requestsViewModel.acceptRequest(toAccept, currentUser, context = contexto) {
-                            feedViewModel.loadPets()
+                        requestsViewModel.aceptarSolicitud(aAceptar, currentUser, contexto = contexto) {
+                            feedViewModel.cargarMascotas()
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
@@ -226,23 +253,23 @@ fun RequestsScreen(
         )
     }
 
-    // DIÁLOGO RF20: Agendar Cita o Entrevista
+    // DIÁLOGO RF20: Agendar Cita con Selector de Fecha y Hora Real
     solicitudPorAgendar?.let { req ->
         DialogoAgendarCita(
             request = req,
             onDismiss = { solicitudPorAgendar = null },
             onConfirm = { fecha, hora, modalidad ->
-                requestsViewModel.scheduleAppointment(
-                    requestId = req.id,
-                    petName = req.petName,
-                    applicantName = req.applicantName,
-                    shelterName = req.shelterName.ifBlank { currentUser?.name ?: "Refugio" },
-                    date = fecha,
-                    time = hora,
-                    modality = modalidad,
-                    currentUser = currentUser,
-                    context = contexto,
-                    onSuccess = {
+                requestsViewModel.agendarCita(
+                    idSolicitud = req.id,
+                    nombreMascota = req.nombreMascota,
+                    nombrePostulante = req.nombreSolicitante,
+                    nombreRefugio = req.nombreRefugio.ifBlank { currentUser?.nombre ?: "Refugio" },
+                    fecha = fecha,
+                    hora = hora,
+                    modalidad = modalidad,
+                    usuarioActual = currentUser,
+                    contexto = contexto,
+                    alTenerExito = {
                         solicitudPorAgendar = null
                         onGoToAppointments()
                     }
@@ -258,9 +285,10 @@ fun TarjetaSolicitud(
     currentUser: User?,
     onAcceptClick: () -> Unit,
     onRejectClick: () -> Unit,
-    onScheduleClick: () -> Unit
+    onScheduleClick: () -> Unit,
+    onChatClick: () -> Unit = {}
 ) {
-    val esRefugio = currentUser?.role == UserRole.REFUGIO
+    val esRefugio = currentUser?.rol == UserRole.REFUGIO
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -274,13 +302,13 @@ fun TarjetaSolicitud(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Fila superior: Nombre de mascota + Chip de estado
+            // Cabecera: Mascota + Botón de Chat + Estado
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                     Icon(
                         imageVector = Icons.Default.Pets,
                         contentDescription = null,
@@ -289,57 +317,78 @@ fun TarjetaSolicitud(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = request.petName,
+                        text = request.nombreMascota,
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp
                     )
                 }
 
-                StatusChip(status = request.status)
+                StatusChip(status = request.estado)
             }
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
-            // Datos del solicitante y refugio
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "Solicitante: ${request.applicantName}",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-
-                if (request.applicantEmail.isNotBlank()) {
+            // Datos del solicitante y refugio + botón directo de Chat en Tiempo Real (RF13)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
-                            imageVector = Icons.Default.Email,
+                            imageVector = Icons.Default.Person,
                             contentDescription = null,
                             modifier = Modifier.size(16.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = request.applicantEmail,
+                            text = "Solicitante: ${request.nombreSolicitante}",
                             fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+
+                    if (request.correoSolicitante.isNotBlank()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Email,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = request.correoSolicitante,
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    if (!esRefugio && request.nombreRefugio.isNotBlank()) {
+                        Text(
+                            text = "Refugio: ${request.nombreRefugio}",
+                            fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
 
-                if (!esRefugio && request.shelterName.isNotBlank()) {
-                    Text(
-                        text = "Refugio a cargo: ${request.shelterName}",
-                        fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                // Botón para abrir el Chat en Tiempo Real entre Adoptante y Refugio (RF13)
+                FilledTonalButton(
+                    onClick = onChatClick,
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Chat,
+                        contentDescription = "Chatear",
+                        modifier = Modifier.size(16.dp)
                     )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Chatear", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
 
@@ -361,7 +410,7 @@ fun TarjetaSolicitud(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = "\"${request.reason}\"",
+                    text = "\"${request.motivo}\"",
                     fontSize = 13.sp,
                     fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
                 )
@@ -372,27 +421,18 @@ fun TarjetaSolicitud(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    VerificacionCuestionario(
-                        etiqueta = "Patio / Jardín",
-                        valor = request.hasYard
-                    )
-                    VerificacionCuestionario(
-                        etiqueta = "Experiencia previa",
-                        valor = request.hasExperience
-                    )
+                    VerificacionCuestionario(etiqueta = "Patio / Jardín", valor = request.tienePatio)
+                    VerificacionCuestionario(etiqueta = "Experiencia previa", valor = request.tieneExperiencia)
                 }
             }
 
-            // Mensajes contextuales según estado para el adoptante
+            // Mensajes según estado para el adoptante
             if (!esRefugio) {
-                when (request.status) {
+                when (request.estado) {
                     RequestStatus.ACEPTADA -> {
-                        Surface(
-                            color = Color(0xFFE8F5E9),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
+                        Surface(color = Color(0xFFE8F5E9), shape = RoundedCornerShape(8.dp)) {
                             Text(
-                                text = "🎉 ¡Felicidades! Tu solicitud fue aprobada. Entra a Citas para ver la coordinación de entrega.",
+                                text = "🎉 ¡Felicidades! Tu solicitud fue aprobada. Coordina por el chat o revisa tus Citas.",
                                 color = Color(0xFF1B5E20),
                                 fontSize = 12.sp,
                                 modifier = Modifier.padding(8.dp),
@@ -401,12 +441,9 @@ fun TarjetaSolicitud(
                         }
                     }
                     RequestStatus.NO_DISPONIBLE -> {
-                        Surface(
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
+                        Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(8.dp)) {
                             Text(
-                                text = "ℹ️ Esta mascota ya fue adoptada por otro postulante que completó el proceso primero.",
+                                text = "ℹ️ Esta mascota ya fue adoptada por otro postulante.",
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 12.sp,
                                 modifier = Modifier.padding(8.dp)
@@ -414,12 +451,9 @@ fun TarjetaSolicitud(
                         }
                     }
                     RequestStatus.RECHAZADA -> {
-                        Surface(
-                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
+                        Surface(color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f), shape = RoundedCornerShape(8.dp)) {
                             Text(
-                                text = "Lo sentimos, el refugio no pudo aprobar esta solicitud en este momento.",
+                                text = "El refugio no pudo aprobar esta solicitud en esta ocasión.",
                                 color = MaterialTheme.colorScheme.error,
                                 fontSize = 12.sp,
                                 modifier = Modifier.padding(8.dp)
@@ -428,7 +462,7 @@ fun TarjetaSolicitud(
                     }
                     RequestStatus.PENDIENTE -> {
                         Text(
-                            text = "⏳ En revisión por el refugio. Te notificaremos cualquier avance.",
+                            text = "⏳ En evaluación por el refugio. Puedes escribirles usando el botón 'Chatear'.",
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.outline
                         )
@@ -436,58 +470,39 @@ fun TarjetaSolicitud(
                 }
             }
 
-            // Botones de acción del Refugio (RF9, RF10, RF20)
-            if (esRefugio && request.status == RequestStatus.PENDIENTE) {
+            // Botones de acción para el Refugio (RF10 y RF20)
+            if (esRefugio && request.estado == RequestStatus.PENDIENTE) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Botón Agendar Cita (RF20)
                     OutlinedButton(
                         onClick = onScheduleClick,
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(10.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.CalendarMonth,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
+                        Icon(imageVector = Icons.Default.CalendarMonth, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Cita", fontSize = 12.sp)
+                        Text("Agendar Cita", fontSize = 12.sp)
                     }
 
-                    // Botón Rechazar
                     OutlinedButton(
                         onClick = onRejectClick,
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error
-                        ),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                         shape = RoundedCornerShape(10.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
+                        Icon(imageVector = Icons.Default.Close, contentDescription = "Rechazar", modifier = Modifier.size(16.dp))
                     }
 
-                    // Botón Aceptar Adopción (RF10)
                     Button(
                         onClick = onAcceptClick,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF2E7D32)
-                        ),
-                        modifier = Modifier.weight(1.3f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                        modifier = Modifier.weight(1.2f),
                         shape = RoundedCornerShape(10.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
+                        Icon(imageVector = Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Aceptar", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("Aprobar", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -517,15 +532,12 @@ fun VerificacionCuestionario(etiqueta: String, valor: Boolean) {
 fun StatusChip(status: RequestStatus) {
     val (colorFondo, colorTexto, textoEtiqueta) = when (status) {
         RequestStatus.PENDIENTE -> Triple(Color(0xFFFFF3E0), Color(0xFFE65100), "Pendiente")
-        RequestStatus.ACEPTADA -> Triple(Color(0xFFE8F5E9), Color(0xFF2E7D32), "Aceptada")
+        RequestStatus.ACEPTADA -> Triple(Color(0xFFE8F5E9), Color(0xFF2E7D32), "Aprobada")
         RequestStatus.RECHAZADA -> Triple(Color(0xFFFFEBEE), Color(0xFFC62828), "Rechazada")
         RequestStatus.NO_DISPONIBLE -> Triple(Color(0xFFEEEEEE), Color(0xFF616161), "No disponible")
     }
 
-    Surface(
-        color = colorFondo,
-        shape = RoundedCornerShape(12.dp)
-    ) {
+    Surface(color = colorFondo, shape = RoundedCornerShape(12.dp)) {
         Text(
             text = textoEtiqueta,
             color = colorTexto,
@@ -536,14 +548,25 @@ fun StatusChip(status: RequestStatus) {
     }
 }
 
+/*
+ * Diálogo para agendar cita usando los selectores oficiales de Fecha y Hora de Android (RF20)
+ */
 @Composable
 fun DialogoAgendarCita(
     request: AdoptionRequest,
     onDismiss: () -> Unit,
     onConfirm: (fecha: String, hora: String, modalidad: String) -> Unit
 ) {
-    var fecha by remember { mutableStateOf("20/10/2026") }
-    var hora by remember { mutableStateOf("15:00") }
+    val contexto = LocalContext.current
+    val calendario = remember { Calendar.getInstance() }
+
+    var fecha by remember {
+        val d = calendario.get(Calendar.DAY_OF_MONTH)
+        val m = calendario.get(Calendar.MONTH) + 1
+        val a = calendario.get(Calendar.YEAR)
+        mutableStateOf(String.format(Locale.getDefault(), "%02d/%02d/%04d", d, m, a))
+    }
+    var hora by remember { mutableStateOf("10:00") }
     var modalidad by remember { mutableStateOf("Presencial") }
 
     AlertDialog(
@@ -552,28 +575,56 @@ fun DialogoAgendarCita(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    text = "Coordina una entrevista con ${request.applicantName} para la adopción de ${request.petName}.",
+                    text = "Coordina una entrevista con ${request.nombreSolicitante} para la adopción de ${request.nombreMascota}.",
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                OutlinedTextField(
-                    value = fecha,
-                    onValueChange = { fecha = it },
-                    label = { Text("Fecha (DD/MM/AAAA)") },
-                    singleLine = true,
+                // Botón para abrir el Calendario oficial de Android
+                OutlinedButton(
+                    onClick = {
+                        DatePickerDialog(
+                            contexto,
+                            { _, anio, mes, dia ->
+                                fecha = String.format(Locale.getDefault(), "%02d/%02d/%04d", dia, mes + 1, anio)
+                            },
+                            calendario.get(Calendar.YEAR),
+                            calendario.get(Calendar.MONTH),
+                            calendario.get(Calendar.DAY_OF_MONTH)
+                        ).apply {
+                            datePicker.minDate = System.currentTimeMillis() - 1000
+                        }.show()
+                    },
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
-                )
+                ) {
+                    Icon(imageVector = Icons.Default.CalendarMonth, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Fecha seleccionada: $fecha", fontWeight = FontWeight.Bold)
+                }
 
-                OutlinedTextField(
-                    value = hora,
-                    onValueChange = { hora = it },
-                    label = { Text("Hora (HH:MM)") },
-                    singleLine = true,
+                // Botón para abrir el Reloj oficial de Android
+                OutlinedButton(
+                    onClick = {
+                        TimePickerDialog(
+                            contexto,
+                            { _, h, min ->
+                                hora = String.format(Locale.getDefault(), "%02d:%02d", h, min)
+                            },
+                            10,
+                            0,
+                            true
+                        ).show()
+                    },
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
-                )
+                ) {
+                    Icon(imageVector = Icons.Default.AccessTime, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Hora seleccionada: $hora hrs", fontWeight = FontWeight.Bold)
+                }
 
-                Text("Modalidad:", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                Text("Modalidad de la entrevista:", fontSize = 13.sp, fontWeight = FontWeight.Medium)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(
                         selected = modalidad == "Presencial",
@@ -581,9 +632,9 @@ fun DialogoAgendarCita(
                         label = { Text("Presencial") }
                     )
                     FilterChip(
-                        selected = modalidad == "Virtual",
-                        onClick = { modalidad = "Virtual" },
-                        label = { Text("Virtual (Meet)") }
+                        selected = modalidad == "Videollamada",
+                        onClick = { modalidad = "Videollamada" },
+                        label = { Text("Videollamada") }
                     )
                 }
             }
@@ -593,7 +644,7 @@ fun DialogoAgendarCita(
                 onClick = { onConfirm(fecha, hora, modalidad) },
                 enabled = fecha.isNotBlank() && hora.isNotBlank()
             ) {
-                Text("Confirmar Cita")
+                Text("Guardar Cita")
             }
         },
         dismissButton = {

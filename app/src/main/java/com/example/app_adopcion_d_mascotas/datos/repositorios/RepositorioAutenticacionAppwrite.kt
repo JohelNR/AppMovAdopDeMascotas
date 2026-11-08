@@ -11,184 +11,270 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.withContext
 
+/*
+ * ============================================================================
+ * ARCHIVO: RepositorioAutenticacionAppwrite.kt
+ * CAPA: Datos -> Repositorios (RF1 y RF2)
+ * ¿QUÉ HACE?: Se encarga de hablar con la tabla "usuarios" y el servicio de
+ *             cuentas de Appwrite Cloud para:
+ *             1. Registrar un usuario nuevo con su rol (ADOPTANTE o REFUGIO).
+ *             2. Iniciar sesión con correo y contraseña.
+ *             3. Recuperar la sesión activa al abrir la app.
+ *             4. Actualizar los datos y foto del perfil en la nube.
+ * ============================================================================
+ */
 object RepositorioAutenticacionAppwrite {
 
+    // Guarda el usuario conectado actualmente para que toda la app lo conozca
     val usuarioActual = MutableStateFlow<Usuario?>(null)
     val currentUser get() = usuarioActual
 
-    suspend fun getCurrentUser(): Usuario? = withContext(Dispatchers.IO) {
+    /*
+     * Obtiene el usuario que tiene sesión iniciada en este momento desde Appwrite Cloud.
+     */
+    suspend fun obtenerUsuarioActual(): Usuario? = withContext(Dispatchers.IO) {
         try {
-            val accountUser = ClienteAppwrite.account.get()
-            // Buscamos su perfil y rol en la tabla de usuarios
-            val response = ClienteAppwrite.databases.listDocuments(
-                databaseId = ClienteAppwrite.DATABASE_ID,
-                collectionId = ClienteAppwrite.USERS_COLLECTION,
-                queries = listOf(Query.equal("userId", accountUser.id))
-            )
-            val doc = response.documents.firstOrNull()
-            val data = doc?.data ?: emptyMap()
-            val roleStr = data["role"]?.toString() ?: "ADOPTANTE"
-            val userRole = if (roleStr.equals("REFUGIO", ignoreCase = true)) RolUsuario.REFUGIO else RolUsuario.ADOPTANTE
+            // Paso 1: Preguntar a Appwrite Auth quién tiene sesión abierta en el teléfono
+            val cuentaActiva = ClienteAppwrite.cuenta.get()
 
-            val user = Usuario(
-                id = accountUser.id,
-                name = accountUser.name.ifBlank { data["name"]?.toString() ?: "Usuario" },
-                email = accountUser.email,
-                role = userRole,
-                phone = data["phone"]?.toString() ?: "",
-                bio = data["bio"]?.toString() ?: "",
-                avatarPhotoId = data["avatarPhotoId"]?.toString() ?: ""
+            // Paso 2: Buscar su fila en la tabla "usuarios" usando su "idUsuario"
+            val respuesta = ClienteAppwrite.baseDeDatos.listDocuments(
+                databaseId = ClienteAppwrite.ID_BASE_DATOS,
+                collectionId = ClienteAppwrite.TABLA_USUARIOS,
+                queries = listOf(Query.equal("idUsuario", cuentaActiva.id))
             )
-            usuarioActual.value = user
-            user
-        } catch (e: Exception) {
+
+            // Paso 3: Extraer los datos en español de la tabla "usuarios"
+            val documento = respuesta.documents.firstOrNull()
+            val datos = documento?.data ?: emptyMap()
+
+            val textoRol = datos["rol"]?.toString() ?: "ADOPTANTE"
+            val rolAsignado = if (textoRol.equals("REFUGIO", ignoreCase = true)) {
+                RolUsuario.REFUGIO
+            } else {
+                RolUsuario.ADOPTANTE
+            }
+
+            // Paso 4: Construir el objeto Usuario listo para las pantallas
+            val usuario = Usuario(
+                id = cuentaActiva.id,
+                name = (datos["nombre"]?.toString() ?: cuentaActiva.name).ifBlank { "Usuario" },
+                email = cuentaActiva.email,
+                role = rolAsignado,
+                phone = datos["telefono"]?.toString() ?: "",
+                bio = datos["biografia"]?.toString() ?: "",
+                avatarPhotoId = datos["fotoPerfilId"]?.toString() ?: ""
+            )
+
+            usuarioActual.value = usuario
+            usuario
+        } catch (_: Exception) {
+            // Si no hay sesión abierta en el teléfono, devolvemos null
             null
         }
     }
 
-    suspend fun obtenerUsuarioActual(): Usuario? = getCurrentUser()
+    suspend fun getCurrentUser(): Usuario? = obtenerUsuarioActual()
 
-    suspend fun login(email: String, password: String): Result<Usuario> = withContext(Dispatchers.IO) {
+    /*
+     * RF1: Iniciar sesión con correo y contraseña en Appwrite Cloud.
+     */
+    suspend fun iniciarSesion(correo: String, contrasena: String): Result<Usuario> = withContext(Dispatchers.IO) {
         try {
-            try { ClienteAppwrite.account.deleteSession("current") } catch (_: Exception) {}
-
-            ClienteAppwrite.account.createEmailPasswordSession(email, password)
-            val user = getCurrentUser()
-            if (user != null) {
-                Result.success(user)
-            } else {
-                Result.failure(Exception("No se pudo obtener el perfil del usuario"))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    suspend fun iniciarSesion(correo: String, contrasena: String): Result<Usuario> = login(correo, contrasena)
-
-    suspend fun register(name: String, email: String, password: String, role: RolUsuario): Result<Usuario> = withContext(Dispatchers.IO) {
-        try {
-            val userId = ID.unique()
-            ClienteAppwrite.account.create(
-                userId = userId,
-                email = email,
-                password = password,
-                name = name
-            )
-
-            // Iniciamos sesión
-            ClienteAppwrite.account.createEmailPasswordSession(email, password)
-
-            // Guardamos el perfil con su rol en la tabla de usuarios
-            ClienteAppwrite.databases.createDocument(
-                databaseId = ClienteAppwrite.DATABASE_ID,
-                collectionId = ClienteAppwrite.USERS_COLLECTION,
-                documentId = ID.unique(),
-                data = mapOf(
-                    "userId" to userId,
-                    "name" to name.trim(),
-                    "email" to email.trim(),
-                    "role" to role.name,
-                    "phone" to "",
-                    "bio" to "",
-                    "avatarPhotoId" to ""
-                )
-            )
-
-            val createdUser = Usuario(
-                id = userId,
-                name = name.trim(),
-                email = email.trim(),
-                role = role
-            )
-            Result.success(createdUser)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    suspend fun registrarUsuario(nombre: String, correo: String, contrasena: String, rol: RolUsuario): Result<Usuario> =
-        register(nombre, correo, contrasena, rol)
-
-    // RF2: Actualización de datos de perfil (nombre, teléfono, biografía, foto avatar)
-    suspend fun updateProfile(
-        userId: String,
-        name: String,
-        phone: String,
-        bio: String,
-        avatarPhotoId: String
-    ): Result<Usuario> = withContext(Dispatchers.IO) {
-        try {
-            // Actualizamos en la cuenta de Appwrite
+            // Paso 1: Si había alguna sesión anterior abierta, la cerramos primero para evitar choques
             try {
-                ClienteAppwrite.account.updateName(name.trim())
+                ClienteAppwrite.cuenta.deleteSession("current")
             } catch (_: Exception) {}
 
-            // Buscamos el documento en la colección de usuarios
-            val response = ClienteAppwrite.databases.listDocuments(
-                databaseId = ClienteAppwrite.DATABASE_ID,
-                collectionId = ClienteAppwrite.USERS_COLLECTION,
-                queries = listOf(Query.equal("userId", userId))
+            // Paso 2: Crear la nueva sesión con correo y contraseña en Appwrite
+            ClienteAppwrite.cuenta.createEmailPasswordSession(
+                email = correo.trim(),
+                password = contrasena
             )
-            val doc = response.documents.firstOrNull()
-            val updateData = mutableMapOf<String, Any>(
-                "name" to name.trim(),
-                "phone" to phone.trim(),
-                "bio" to bio.trim()
-            )
-            if (avatarPhotoId.isNotBlank()) {
-                updateData["avatarPhotoId"] = avatarPhotoId
-            }
 
-            if (doc != null) {
-                ClienteAppwrite.databases.updateDocument(
-                    databaseId = ClienteAppwrite.DATABASE_ID,
-                    collectionId = ClienteAppwrite.USERS_COLLECTION,
-                    documentId = doc.id,
-                    data = updateData
-                )
+            // Paso 3: Leer el perfil completo (con su rol ADOPTANTE o REFUGIO) desde la tabla "usuarios"
+            val usuario = obtenerUsuarioActual()
+            if (usuario != null) {
+                Result.success(usuario)
             } else {
-                updateData["userId"] = userId
-                ClienteAppwrite.databases.createDocument(
-                    databaseId = ClienteAppwrite.DATABASE_ID,
-                    collectionId = ClienteAppwrite.USERS_COLLECTION,
-                    documentId = ID.unique(),
-                    data = updateData
-                )
+                Result.failure(Exception("No se encontró el perfil del usuario en la base de datos"))
             }
-
-            val updatedUser = getCurrentUser() ?: Usuario(
-                id = userId,
-                name = name.trim(),
-                email = "",
-                phone = phone.trim(),
-                bio = bio.trim(),
-                avatarPhotoId = avatarPhotoId
-            )
-            Result.success(updatedUser)
-        } catch (e: Exception) {
-            Result.failure(e)
+        } catch (error: Exception) {
+            Result.failure(error)
         }
     }
 
+    suspend fun login(email: String, password: String): Result<Usuario> = iniciarSesion(email, password)
+
+    /*
+     * RF1: Registrar una cuenta nueva en Appwrite Cloud guardando su rol (ADOPTANTE o REFUGIO).
+     */
+    suspend fun registrarUsuario(
+        nombre: String,
+        correo: String,
+        contrasena: String,
+        rol: RolUsuario
+    ): Result<Usuario> = withContext(Dispatchers.IO) {
+        try {
+            val nombreLimpio = nombre.trim()
+            val correoLimpio = correo.trim()
+
+            // Paso 1: Cerrar cualquier sesión previa en el teléfono para que Appwrite NO bloquee el registro
+            try {
+                ClienteAppwrite.cuenta.deleteSession("current")
+            } catch (_: Exception) {}
+
+            // Paso 2: Crear la cuenta en Appwrite Auth (o recuperar su ID si ya se había creado en Auth)
+            val nuevoIdUsuario = ID.unique()
+            ClienteAppwrite.cuenta.create(
+                userId = nuevoIdUsuario,
+                email = correoLimpio,
+                password = contrasena,
+                name = nombreLimpio
+            )
+
+            // Paso 3: Iniciar sesión inmediatamente con la cuenta recién creada
+            ClienteAppwrite.cuenta.createEmailPasswordSession(
+                email = correoLimpio,
+                password = contrasena
+            )
+
+            // Paso 4: Guardar los datos y el ROL elegido (ADOPTANTE o REFUGIO) en la tabla "usuarios"
+            val datosNuevoUsuario = mapOf(
+                "idUsuario" to nuevoIdUsuario,
+                "nombre" to nombreLimpio,
+                "correo" to correoLimpio,
+                "rol" to rol.name,
+                "telefono" to "",
+                "biografia" to "",
+                "fotoPerfilId" to ""
+            )
+
+            ClienteAppwrite.baseDeDatos.createDocument(
+                databaseId = ClienteAppwrite.ID_BASE_DATOS,
+                collectionId = ClienteAppwrite.TABLA_USUARIOS,
+                documentId = ID.unique(),
+                data = datosNuevoUsuario
+            )
+
+            // Paso 5: Actualizar el usuario en memoria y devolver éxito
+            val usuarioCreado = Usuario(
+                id = nuevoIdUsuario,
+                name = nombreLimpio,
+                email = correoLimpio,
+                role = rol
+            )
+            usuarioActual.value = usuarioCreado
+            Result.success(usuarioCreado)
+        } catch (error: Exception) {
+            Result.failure(error)
+        }
+    }
+
+    suspend fun register(name: String, email: String, password: String, role: RolUsuario): Result<Usuario> =
+        registrarUsuario(name, email, password, role)
+
+    /*
+     * RF2: Actualizar nombre, teléfono, biografía y foto de perfil en la tabla "usuarios".
+     */
     suspend fun actualizarPerfil(
         idUsuario: String,
         nombre: String,
         telefono: String,
         biografia: String,
         idFotoAvatar: String
-    ): Result<Usuario> = updateProfile(idUsuario, nombre, telefono, biografia, idFotoAvatar)
-
-    suspend fun logout() = withContext(Dispatchers.IO) {
-        usuarioActual.value = null
+    ): Result<Usuario> = withContext(Dispatchers.IO) {
         try {
-            ClienteAppwrite.account.deleteSession("current")
-        } catch (e: Exception) {
-            e.printStackTrace()
+            val nombreLimpio = nombre.trim()
+            val telefonoLimpio = telefono.trim()
+            val biografiaLimpia = biografia.trim()
+
+            // Paso 1: Actualizar el nombre también en Appwrite Auth
+            try {
+                ClienteAppwrite.cuenta.updateName(nombreLimpio)
+            } catch (_: Exception) {}
+
+            // Paso 2: Buscar el documento del usuario en la tabla "usuarios"
+            val respuesta = ClienteAppwrite.baseDeDatos.listDocuments(
+                databaseId = ClienteAppwrite.ID_BASE_DATOS,
+                collectionId = ClienteAppwrite.TABLA_USUARIOS,
+                queries = listOf(Query.equal("idUsuario", idUsuario))
+            )
+            val documentoExistente = respuesta.documents.firstOrNull()
+
+            // Paso 3: Preparar el mapa con las columnas en español a actualizar
+            val datosActualizados = mutableMapOf<String, Any>(
+                "nombre" to nombreLimpio,
+                "telefono" to telefonoLimpio,
+                "biografia" to biografiaLimpia
+            )
+            if (idFotoAvatar.isNotBlank()) {
+                datosActualizados["fotoPerfilId"] = idFotoAvatar
+            }
+
+            // Paso 4: Guardar los cambios en la tabla "usuarios" de Appwrite
+            if (documentoExistente != null) {
+                ClienteAppwrite.baseDeDatos.updateDocument(
+                    databaseId = ClienteAppwrite.ID_BASE_DATOS,
+                    collectionId = ClienteAppwrite.TABLA_USUARIOS,
+                    documentId = documentoExistente.id,
+                    data = datosActualizados
+                )
+            } else {
+                val rolActual = usuarioActual.value?.rol?.name ?: RolUsuario.ADOPTANTE.name
+                val correoActual = usuarioActual.value?.correo ?: ""
+                datosActualizados["idUsuario"] = idUsuario
+                datosActualizados["correo"] = correoActual
+                datosActualizados["rol"] = rolActual
+                if (!datosActualizados.containsKey("fotoPerfilId")) {
+                    datosActualizados["fotoPerfilId"] = ""
+                }
+                ClienteAppwrite.baseDeDatos.createDocument(
+                    databaseId = ClienteAppwrite.ID_BASE_DATOS,
+                    collectionId = ClienteAppwrite.TABLA_USUARIOS,
+                    documentId = ID.unique(),
+                    data = datosActualizados
+                )
+            }
+
+            // Paso 5: Volver a leer el usuario actualizado desde la nube
+            val usuarioFresco = obtenerUsuarioActual() ?: Usuario(
+                id = idUsuario,
+                name = nombreLimpio,
+                email = usuarioActual.value?.correo ?: "",
+                role = usuarioActual.value?.rol ?: RolUsuario.ADOPTANTE,
+                phone = telefonoLimpio,
+                bio = biografiaLimpia,
+                avatarPhotoId = idFotoAvatar
+            )
+            usuarioActual.value = usuarioFresco
+            Result.success(usuarioFresco)
+        } catch (error: Exception) {
+            Result.failure(error)
         }
     }
 
-    suspend fun cerrarSesion() = logout()
+    suspend fun updateProfile(
+        userId: String,
+        name: String,
+        phone: String,
+        bio: String,
+        avatarPhotoId: String
+    ): Result<Usuario> = actualizarPerfil(userId, name, phone, bio, avatarPhotoId)
+
+    /*
+     * Cerrar la sesión actual en el servidor y limpiar el usuario activo.
+     */
+    suspend fun cerrarSesion() = withContext(Dispatchers.IO) {
+        usuarioActual.value = null
+        try {
+            ClienteAppwrite.cuenta.deleteSession("current")
+        } catch (error: Exception) {
+            error.printStackTrace()
+        }
+    }
+
+    suspend fun logout() = cerrarSesion()
 }
 
 typealias AppwriteAuthRepository = RepositorioAutenticacionAppwrite

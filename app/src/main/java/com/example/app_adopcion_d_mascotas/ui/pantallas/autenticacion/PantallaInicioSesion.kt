@@ -1,5 +1,8 @@
 package com.example.app_adopcion_d_mascotas.ui.pantallas.autenticacion
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -7,263 +10,397 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Pets
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavHostController
-import androidx.navigation.compose.rememberNavController
 import com.example.app_adopcion_d_mascotas.datos.modelos.RolUsuario
-import com.example.app_adopcion_d_mascotas.datos.modelos.User
-import com.example.app_adopcion_d_mascotas.datos.modelos.UserRole
 import com.example.app_adopcion_d_mascotas.datos.modelos.Usuario
-import com.example.app_adopcion_d_mascotas.ui.modelovista.AuthViewModel
 import com.example.app_adopcion_d_mascotas.ui.modelovista.ModeloAutenticacion
 
+/*
+ * ============================================================================
+ * ARCHIVO: PantallaInicioSesion.kt
+ * CAPA: UI -> Pantallas -> Autenticación (RF1: Registro e Inicio de Sesión)
+ * ¿QUÉ HACE?: Dibuja la pantalla de bienvenida donde el usuario puede:
+ *             1. Iniciar sesión con su correo y contraseña reales en Appwrite.
+ *             2. Registrarse eligiendo claramente su rol: ADOPTANTE o REFUGIO.
+ * ============================================================================
+ */
 @Composable
 fun PantallaInicioSesion(
     modeloAutenticacion: ModeloAutenticacion = viewModel(),
     alIniciarSesion: (Usuario) -> Unit
 ) {
-    // Variables de estado en español
+    // Paso 1: Variables de estado en español para guardar lo que escribe el usuario
     var nombre by remember { mutableStateOf("") }
     var correo by remember { mutableStateOf("") }
     var contrasena by remember { mutableStateOf("") }
     var rolSeleccionado by remember { mutableStateOf(RolUsuario.ADOPTANTE) }
     var modoRegistro by remember { mutableStateOf(false) }
+    var mostrarContrasena by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        Column(
+        Card(
             modifier = Modifier
-                .widthIn(max = 480.dp)
+                .widthIn(max = 460.dp)
                 .fillMaxWidth()
-                .padding(24.dp)
-                .verticalScroll(rememberScrollState()),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+                .padding(20.dp),
+            shape = RoundedCornerShape(28.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
-        // Logo de la aplicación
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.primaryContainer,
-            modifier = Modifier.size(90.dp)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.Default.Pets,
-                    contentDescription = "Logo",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(48.dp)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            text = "AdoptaAmor",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
-
-        Text(
-            text = if (modoRegistro) "Crea tu cuenta" else "Inicia sesión para continuar",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Si está en modo registro, pedimos nombre y rol
-        if (modoRegistro) {
-            OutlinedTextField(
-                value = nombre,
-                onValueChange = { nombre = it },
-                label = { Text("Nombre completo o del refugio") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Selector de Rol: Adoptante o Refugio
-            Text(
-                text = "Tipo de perfil:",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.align(Alignment.Start)
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp)
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                FilterChip(
-                    selected = rolSeleccionado == RolUsuario.ADOPTANTE,
-                    onClick = { rolSeleccionado = RolUsuario.ADOPTANTE },
-                    label = { Text("Adoptante") },
-                    modifier = Modifier.weight(1f)
-                )
-                FilterChip(
-                    selected = rolSeleccionado == RolUsuario.REFUGIO,
-                    onClick = { rolSeleccionado = RolUsuario.REFUGIO },
-                    label = { Text("Refugio") },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-        }
-
-        OutlinedTextField(
-            value = correo,
-            onValueChange = { correo = it },
-            label = { Text("Correo electrónico") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        OutlinedTextField(
-            value = contrasena,
-            onValueChange = { contrasena = it },
-            label = { Text("Contraseña (mínimo 8 caracteres)") },
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        // Mensaje de error si falla algo
-        modeloAutenticacion.mensajeError?.let { error ->
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = error,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall
-            )
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // Botón Principal: Iniciar Sesión o Registrarse
-        Button(
-            onClick = {
-                if (modoRegistro) {
-                    modeloAutenticacion.registrarse(nombre, correo, contrasena, rolSeleccionado, alIniciarSesion)
-                } else {
-                    modeloAutenticacion.iniciarSesion(correo, contrasena, alIniciarSesion)
+                // Paso 2: Logo circular y título principal de la aplicación
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier.size(84.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Pets,
+                            contentDescription = "Logo AdoptaAmor",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(44.dp)
+                        )
+                    }
                 }
-            },
-            enabled = !modeloAutenticacion.estaCargando,
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(50.dp)
-        ) {
-            if (modeloAutenticacion.estaCargando) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(24.dp),
-                    color = MaterialTheme.colorScheme.onPrimary
-                )
-            } else {
+
+                Spacer(modifier = Modifier.height(14.dp))
+
                 Text(
-                    text = if (modoRegistro) "Registrarme" else "Iniciar Sesión",
-                    fontWeight = FontWeight.Bold
+                    text = "AdoptaAmor",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.primary
                 )
-            }
-        }
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Alternar entre login y registro
-        TextButton(
-            onClick = {
-                modoRegistro = !modoRegistro
-            }
-        ) {
-            Text(
-                text = if (modoRegistro) "¿Ya tienes cuenta? Inicia sesión" else "¿No tienes cuenta? Regístrate aquí"
-            )
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Inicio de sesión con Google
-        OutlinedButton(
-            onClick = { modeloAutenticacion.iniciarSesionConGoogle(alIniciarSesion) },
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(50.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
                 Text(
-                    text = "G",
-                    fontWeight = FontWeight.Black,
-                    fontSize = 20.sp,
-                    color = Color(0xFF4285F4)
+                    text = if (modoRegistro)
+                        "Crea tu cuenta oficial en la nube"
+                    else
+                        "Conectando corazones con huellitas",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
                 )
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = "Continuar con Google",
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 15.sp
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Selector tipo pestaña superior: "Iniciar Sesión" vs "Registrarse"
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = !modoRegistro,
+                        onClick = {
+                            modoRegistro = false
+                            modeloAutenticacion.limpiarError()
+                        },
+                        label = {
+                            Text(
+                                text = "Iniciar Sesión",
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.Center,
+                                fontWeight = FontWeight.Bold
+                            )
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                    FilterChip(
+                        selected = modoRegistro,
+                        onClick = {
+                            modoRegistro = true
+                            modeloAutenticacion.limpiarError()
+                        },
+                        label = {
+                            Text(
+                                text = "Crear Cuenta",
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.Center,
+                                fontWeight = FontWeight.Bold
+                            )
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Paso 3: Si está en modo Registro, mostrar tarjetas grandes de Rol y campo de Nombre
+                AnimatedVisibility(visible = modoRegistro) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = "1. ¿Cómo deseas registrarte? *",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            TarjetaSelectorRol(
+                                titulo = "Adoptante",
+                                subtitulo = "Quiero adoptar una mascota",
+                                icono = Icons.Default.Person,
+                                seleccionado = rolSeleccionado == RolUsuario.ADOPTANTE,
+                                alSeleccionar = { rolSeleccionado = RolUsuario.ADOPTANTE },
+                                modifier = Modifier.weight(1f)
+                            )
+                            TarjetaSelectorRol(
+                                titulo = "Refugio",
+                                subtitulo = "Publico mascotas en adopción",
+                                icono = Icons.Default.Home,
+                                seleccionado = rolSeleccionado == RolUsuario.REFUGIO,
+                                alSeleccionar = { rolSeleccionado = RolUsuario.REFUGIO },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        OutlinedTextField(
+                            value = nombre,
+                            onValueChange = {
+                                nombre = it
+                                modeloAutenticacion.limpiarError()
+                            },
+                            label = {
+                                Text(
+                                    if (rolSeleccionado == RolUsuario.REFUGIO)
+                                        "Nombre del Refugio o Albergue *"
+                                    else
+                                        "Tu Nombre Completo *"
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = if (rolSeleccionado == RolUsuario.REFUGIO) Icons.Default.Home else Icons.Default.Person,
+                                    contentDescription = null
+                                )
+                            },
+                            singleLine = true,
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+                }
+
+                // Paso 4: Campo de Correo Electrónico
+                OutlinedTextField(
+                    value = correo,
+                    onValueChange = {
+                        correo = it
+                        modeloAutenticacion.limpiarError()
+                    },
+                    label = { Text("Correo electrónico *") },
+                    leadingIcon = {
+                        Icon(imageVector = Icons.Default.Email, contentDescription = null)
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth()
                 )
-            }
-        }
 
-        Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-        HorizontalDivider()
+                // Paso 5: Campo de Contraseña con botón para mostrar/ocultar texto
+                OutlinedTextField(
+                    value = contrasena,
+                    onValueChange = {
+                        contrasena = it
+                        modeloAutenticacion.limpiarError()
+                    },
+                    label = { Text("Contraseña (mínimo 8 caracteres) *") },
+                    leadingIcon = {
+                        Icon(imageVector = Icons.Default.Lock, contentDescription = null)
+                    },
+                    trailingIcon = {
+                        IconButton(onClick = { mostrarContrasena = !mostrarContrasena }) {
+                            Icon(
+                                imageVector = if (mostrarContrasena) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                contentDescription = "Mostrar u ocultar contraseña"
+                            )
+                        }
+                    },
+                    visualTransformation = if (mostrarContrasena) VisualTransformation.None else PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
 
-        Spacer(modifier = Modifier.height(16.dp))
+                // Paso 6: Mostrar recuadro de error si alguna validación falla
+                modeloAutenticacion.mensajeError?.let { error ->
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = error,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(12.dp)
+                        )
+                    }
+                }
 
-        Text(
-            text = "Acceso Rápido de Prueba (Demo)",
-            fontSize = 12.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+                Spacer(modifier = Modifier.height(20.dp))
 
-        Spacer(modifier = Modifier.height(8.dp))
+                // Paso 7: Botón principal para enviar a Appwrite Cloud
+                Button(
+                    onClick = {
+                        if (modoRegistro) {
+                            modeloAutenticacion.registrarse(
+                                nombre = nombre,
+                                correo = correo,
+                                contrasena = contrasena,
+                                rol = rolSeleccionado,
+                                alTenerExito = alIniciarSesion
+                            )
+                        } else {
+                            modeloAutenticacion.iniciarSesion(
+                                correo = correo,
+                                contrasena = contrasena,
+                                alTenerExito = alIniciarSesion
+                            )
+                        }
+                    },
+                    enabled = !modeloAutenticacion.estaCargando,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                ) {
+                    if (modeloAutenticacion.estaCargando) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(22.dp),
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text("Conectando con Appwrite...", fontWeight = FontWeight.Bold)
+                    } else {
+                        Text(
+                            text = if (modoRegistro)
+                                "Registrarme como ${if (rolSeleccionado == RolUsuario.REFUGIO) "Refugio" else "Adoptante"}"
+                            else
+                                "Ingresar a mi Cuenta",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp
+                        )
+                    }
+                }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            OutlinedButton(
-                onClick = { modeloAutenticacion.accesoRapidoDemo(RolUsuario.ADOPTANTE, alIniciarSesion) },
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("Entrar Adoptante", fontSize = 12.sp)
-            }
+                Spacer(modifier = Modifier.height(10.dp))
 
-            OutlinedButton(
-                onClick = { modeloAutenticacion.accesoRapidoDemo(RolUsuario.REFUGIO, alIniciarSesion) },
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("Entrar Refugio", fontSize = 12.sp)
+                // Enlace inferior para cambiar entre Registro e Inicio de Sesión
+                TextButton(
+                    onClick = {
+                        modoRegistro = !modoRegistro
+                        modeloAutenticacion.limpiarError()
+                    }
+                ) {
+                    Text(
+                        text = if (modoRegistro)
+                            "¿Ya tienes una cuenta registrada? Inicia sesión aquí"
+                        else
+                            "¿Eres nuevo adoptante o refugio? Regístrate aquí"
+                    )
+                }
             }
         }
     }
 }
+
+/*
+ * Componente visual para elegir claramente entre el rol ADOPTANTE y el rol REFUGIO
+ */
+@Composable
+private fun TarjetaSelectorRol(
+    titulo: String,
+    subtitulo: String,
+    icono: androidx.compose.ui.graphics.vector.ImageVector,
+    seleccionado: Boolean,
+    alSeleccionar: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colorFondo = if (seleccionado) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+    }
+    val colorBorde = if (seleccionado) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.outlineVariant
+    }
+
+    Surface(
+        modifier = modifier
+            .clickable { alSeleccionar() },
+        shape = RoundedCornerShape(14.dp),
+        color = colorFondo,
+        border = BorderStroke(if (seleccionado) 2.dp else 1.dp, colorBorde)
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                imageVector = icono,
+                contentDescription = titulo,
+                tint = if (seleccionado) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(28.dp)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = titulo,
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                color = if (seleccionado) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = subtitulo,
+                fontSize = 11.sp,
+                textAlign = TextAlign.Center,
+                lineHeight = 14.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
 }

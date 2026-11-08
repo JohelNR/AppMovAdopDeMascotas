@@ -9,29 +9,41 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.DoneAll
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.app_adopcion_d_mascotas.datos.modelos.ChatMessage
-import com.example.app_adopcion_d_mascotas.datos.modelos.MensajeChat
-import com.example.app_adopcion_d_mascotas.datos.repositorios.AppwriteAuthRepository
 import com.example.app_adopcion_d_mascotas.datos.repositorios.RepositorioAutenticacionAppwrite
-import com.example.app_adopcion_d_mascotas.ui.modelovista.ChatViewModel
 import com.example.app_adopcion_d_mascotas.ui.modelovista.ModeloChat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-// RF13: Pantalla de Chat en tiempo real Adoptante - Refugio
+/*
+ * ============================================================================
+ * PANTALLA DE CHAT EN TIEMPO REAL ADOPTANTE <-> REFUGIO (RF13)
+ * ============================================================================
+ * ¿Qué hace esta pantalla?
+ * 1. Carga todos los mensajes reales de la tabla `mensajes` en Appwrite Cloud.
+ * 2. Escucha eventos en vivo mediante WebSockets (Appwrite Realtime) para que
+ *    cuando la otra persona escriba, el mensaje aparezca al instante.
+ * 3. Diferencia claramente qué mensajes envié yo (`esMio = true`, a la derecha)
+ *    y cuáles envió la otra persona (`esMio = false`, a la izquierda).
+ * ============================================================================
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PantallaChat(
@@ -57,23 +69,25 @@ fun ChatScreen(
     onBackClick: () -> Unit,
     viewModel: ModeloChat = viewModel()
 ) {
+    val contexto = LocalContext.current
     val mensajes by viewModel.listaMensajes.collectAsState()
     val textoMensaje by viewModel.textoEntrada.collectAsState()
     val estaCargando by viewModel.estaCargando.collectAsState()
-    val usuarioActual by AppwriteAuthRepository.currentUser.collectAsState()
+    val usuarioActual by RepositorioAutenticacionAppwrite.usuarioActual.collectAsState()
 
     val estadoLista = rememberLazyListState()
 
-    // Inicializar chat
+    // Paso 1: Inicializar canal de chat en Appwrite Cloud y suscribirse a Realtime
     LaunchedEffect(chatId) {
         viewModel.inicializarChat(
             idChat = chatId,
             nombreMascota = petName,
-            nombreDestinatario = receiverName
+            nombreDestinatario = receiverName,
+            contexto = contexto
         )
     }
 
-    // Auto-scroll hacia el último mensaje cuando llega uno nuevo
+    // Paso 2: Auto-scroll suave hacia el último mensaje cuando llega uno nuevo
     LaunchedEffect(mensajes.size) {
         if (mensajes.isNotEmpty()) {
             estadoLista.animateScrollToItem(mensajes.size - 1)
@@ -114,7 +128,7 @@ fun ChatScreen(
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = if (petName.isNotEmpty()) "Interés en $petName 🐾" else "En línea",
+                                    text = if (petName.isNotEmpty()) "Conversación sobre $petName 🐾" else "Conectado a Appwrite Cloud",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -130,13 +144,21 @@ fun ChatScreen(
                         )
                     }
                 },
+                actions = {
+                    IconButton(onClick = { viewModel.cargarMensajes() }) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Sincronizar mensajes"
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 )
             )
         },
         bottomBar = {
-            // Barra de input con imePadding para que el teclado virtual nunca la tape
+            // Barra inferior con imePadding para adaptarse siempre al teclado
             Surface(
                 tonalElevation = 6.dp,
                 modifier = Modifier
@@ -154,38 +176,38 @@ fun ChatScreen(
                             .padding(horizontal = 12.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                    OutlinedTextField(
-                        value = textoMensaje,
-                        onValueChange = { viewModel.cambiarTextoMensaje(it) },
-                        placeholder = { Text("Escribe un mensaje...") },
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(end = 8.dp),
-                        shape = RoundedCornerShape(24.dp),
-                        maxLines = 4
-                    )
-                    IconButton(
-                        onClick = { viewModel.enviarMensaje() },
-                        enabled = textoMensaje.isNotBlank(),
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (textoMensaje.isNotBlank()) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.surfaceVariant
-                            )
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Send,
-                            contentDescription = "Enviar",
-                            tint = if (textoMensaje.isNotBlank()) MaterialTheme.colorScheme.onPrimary
-                            else MaterialTheme.colorScheme.onSurfaceVariant
+                        OutlinedTextField(
+                            value = textoMensaje,
+                            onValueChange = { viewModel.cambiarTextoMensaje(it) },
+                            placeholder = { Text("Escribe un mensaje real al refugio...") },
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 8.dp),
+                            shape = RoundedCornerShape(24.dp),
+                            maxLines = 4
                         )
+                        IconButton(
+                            onClick = { viewModel.enviarMensaje() },
+                            enabled = textoMensaje.isNotBlank(),
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (textoMensaje.isNotBlank()) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.surfaceVariant
+                                )
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Send,
+                                contentDescription = "Enviar mensaje",
+                                tint = if (textoMensaje.isNotBlank()) MaterialTheme.colorScheme.onPrimary
+                                else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
         }
-    }
     ) { innerPadding ->
         Box(
             modifier = Modifier
@@ -202,6 +224,36 @@ fun ChatScreen(
             ) {
                 if (estaCargando && mensajes.isEmpty()) {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                } else if (mensajes.isEmpty()) {
+                    // Estado vacío claro cuando aún no hay mensajes en este canal
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Chat,
+                            contentDescription = null,
+                            modifier = Modifier.size(56.dp),
+                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "Inicia la conversación con $receiverName",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Todos los mensajes se guardan en tiempo real en la tabla 'mensajes' de Appwrite Cloud.",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 } else {
                     LazyColumn(
                         state = estadoLista,
@@ -211,7 +263,8 @@ fun ChatScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(mensajes) { mensaje ->
-                            val esMio = mensaje.senderId == (usuarioActual?.id ?: "user_me") || mensaje.senderId != "shelter_host"
+                            // Comparamos el idEmisor con el ID del usuario logueado
+                            val esMio = mensaje.idEmisor == (usuarioActual?.id ?: "")
                             BurbujaMensaje(message = mensaje, isMe = esMio)
                         }
                     }
@@ -233,7 +286,7 @@ private fun BurbujaMensaje(message: ChatMessage, isMe: Boolean) {
     }
 
     val formatoHora = remember { SimpleDateFormat("hh:mm a", Locale.getDefault()) }
-    val textoHora = remember(message.timestamp) { formatoHora.format(Date(message.timestamp)) }
+    val textoHora = remember(message.fechaHora) { formatoHora.format(Date(message.fechaHora)) }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -245,9 +298,9 @@ private fun BurbujaMensaje(message: ChatMessage, isMe: Boolean) {
             modifier = Modifier.widthIn(max = 280.dp)
         ) {
             Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                if (!isMe && message.senderName.isNotEmpty()) {
+                if (!isMe && message.nombreEmisor.isNotEmpty()) {
                     Text(
-                        text = message.senderName,
+                        text = message.nombreEmisor,
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
@@ -256,7 +309,7 @@ private fun BurbujaMensaje(message: ChatMessage, isMe: Boolean) {
                 }
 
                 Text(
-                    text = message.text,
+                    text = message.texto,
                     style = MaterialTheme.typography.bodyMedium,
                     color = colorTexto
                 )
@@ -279,7 +332,7 @@ private fun BurbujaMensaje(message: ChatMessage, isMe: Boolean) {
                             imageVector = Icons.Default.DoneAll,
                             contentDescription = "Enviado",
                             modifier = Modifier.size(14.dp),
-                            tint = if (message.isRead) Color(0xFF1E88E5) else colorTexto.copy(alpha = 0.7f)
+                            tint = if (message.leido) Color(0xFF1E88E5) else colorTexto.copy(alpha = 0.7f)
                         )
                     }
                 }

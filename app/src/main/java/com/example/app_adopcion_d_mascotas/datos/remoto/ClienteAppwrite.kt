@@ -8,49 +8,94 @@ import io.appwrite.services.Realtime
 import io.appwrite.services.Storage
 import io.appwrite.services.TablesDB
 
+/*
+ * ============================================================================
+ * ARCHIVO: ClienteAppwrite.kt
+ * CAPA: Datos -> Remoto (Conexión con la nube Appwrite Cloud)
+ * ¿QUÉ HACE?: Es el "puente" único (Singleton) entre el celular y nuestro
+ *             servidor en internet (Appwrite Cloud).
+ *             Aquí están guardados los nombres en español de las 6 tablas.
+ * ============================================================================
+ */
 object ClienteAppwrite {
+
+    // 1. Dirección del servidor en la nube y código de nuestro proyecto
     const val ENDPOINT = "https://fra.cloud.appwrite.io/v1"
     const val PROJECT_ID = "6aceca44001361ba94f0"
-    const val DATABASE_ID = "adopcion_db"
-    const val BUCKET_ID = "fotos_mascotas"
 
-    const val PETS_COLLECTION = "mascotas"
-    const val USERS_COLLECTION = "6acf7f910021e8558b65"
-    const val REQUESTS_COLLECTION = "6acf8155000ecaf2f811"
-    const val APPOINTMENTS_COLLECTION = "6acf82b100251fdf4d9b"
-    const val FOLLOWUPS_COLLECTION = "seguimientos"
-    const val CHATS_COLLECTION = "mensajes"
+    // 2. Nombre de la Base de Datos y del Almacén de Fotos (Bucket)
+    const val ID_BASE_DATOS = "adopcion_db"
+    const val ID_BUCKET_FOTOS = "fotos_mascotas"
 
-    private lateinit var client: Client
-    lateinit var account: Account
+    // 3. Nombres de las 6 Tablas en Español (Colecciones en Appwrite)
+    const val TABLA_USUARIOS = "usuarios"
+    const val TABLA_MASCOTAS = "mascotas"
+    const val TABLA_SOLICITUDES = "solicitudes"
+    const val TABLA_CITAS = "citas"
+    const val TABLA_SEGUIMIENTOS = "seguimientos"
+    const val TABLA_MENSAJES = "mensajes"
+
+    // Alias para mantener compatibilidad con cualquier referencia anterior
+    const val DATABASE_ID = ID_BASE_DATOS
+    const val BUCKET_ID = ID_BUCKET_FOTOS
+    const val USERS_COLLECTION = TABLA_USUARIOS
+    const val PETS_COLLECTION = TABLA_MASCOTAS
+    const val REQUESTS_COLLECTION = TABLA_SOLICITUDES
+    const val APPOINTMENTS_COLLECTION = TABLA_CITAS
+    const val FOLLOWUPS_COLLECTION = TABLA_SEGUIMIENTOS
+    const val CHATS_COLLECTION = TABLA_MENSAJES
+
+    // 4. Servicios oficiales de Appwrite (Cuentas, Base de Datos, Fotos y Tiempo Real)
+    private lateinit var cliente: Client
+    lateinit var cuenta: Account
         private set
-    lateinit var databases: Databases
+    lateinit var baseDeDatos: Databases
         private set
-    lateinit var tablesDB: TablesDB
+    lateinit var tablasDB: TablesDB
         private set
-    lateinit var storage: Storage
+    lateinit var almacenamiento: Storage
         private set
-    lateinit var realtime: Realtime
+    lateinit var tiempoReal: Realtime
         private set
 
-    fun init(context: Context) {
-        client = Client(context)
+    // Alias de servicios
+    val account: Account get() = cuenta
+    val databases: Databases get() = baseDeDatos
+    val tablesDB: TablesDB get() = tablasDB
+    val storage: Storage get() = almacenamiento
+    val realtime: Realtime get() = tiempoReal
+
+    /*
+     * Función que enciende la conexión con Appwrite al abrir la aplicación (en MainActivity)
+     */
+    fun inicializar(contexto: Context) {
+        // Paso 1: Configurar el cliente con el servidor y ID del proyecto
+        cliente = Client(contexto)
             .setEndpoint(ENDPOINT)
             .setProject(PROJECT_ID)
 
-        account = Account(client)
-        databases = Databases(client)
-        tablesDB = TablesDB(client)
-        storage = Storage(client)
-        realtime = Realtime(client)
+        // Paso 2: Crear cada servicio usando ese cliente conectado
+        cuenta = Account(cliente)
+        baseDeDatos = Databases(cliente)
+        tablasDB = TablesDB(cliente)
+        almacenamiento = Storage(cliente)
+        tiempoReal = Realtime(cliente)
     }
 
-    fun getFileViewUrl(fileId: String): String {
-        return if (fileId.startsWith("http")) fileId else "$ENDPOINT/storage/buckets/$BUCKET_ID/files/$fileId/view?project=$PROJECT_ID"
+    fun init(context: Context) = inicializar(context)
+
+    /*
+     * Función que convierte el ID de una foto subida a Appwrite en un enlace web (URL)
+     * para poder mostrarla en la pantalla del celular.
+     */
+    fun obtenerUrlArchivo(idArchivo: String): String {
+        // Si ya es un enlace completo (http...), lo devolvemos tal cual
+        if (idArchivo.startsWith("http")) return idArchivo
+        // Si es un ID de Appwrite Storage, armamos el enlace de visualización
+        return "$ENDPOINT/storage/buckets/$ID_BUCKET_FOTOS/files/$idArchivo/view?project=$PROJECT_ID"
     }
 
-    fun obtenerUrlArchivo(idArchivo: String): String = getFileViewUrl(idArchivo)
+    fun getFileViewUrl(fileId: String): String = obtenerUrlArchivo(fileId)
 }
 
-// Alias para compatibilidad total
 typealias AppwriteClient = ClienteAppwrite

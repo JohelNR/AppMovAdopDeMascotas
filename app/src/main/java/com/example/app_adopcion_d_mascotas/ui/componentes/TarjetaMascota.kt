@@ -21,8 +21,18 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.app_adopcion_d_mascotas.datos.modelos.EstadoMascota
 import com.example.app_adopcion_d_mascotas.datos.modelos.Mascota
-import com.example.app_adopcion_d_mascotas.datos.modelos.Pet
 
+/*
+ * ============================================================================
+ * TARJETA VISUAL DE MASCOTA EN EL CATÁLOGO (RF5 y RF6)
+ * ============================================================================
+ * ¿Qué muestra esta tarjeta?
+ * 1. Foto principal desde Appwrite Storage con contador de fotos si hay álbum.
+ * 2. Etiqueta roja "CASO URGENTE" si la mascota necesita hogar prioritario.
+ * 3. Nombre, especie, raza, edad, tamaño, ubicación, refugio y estado actual
+ *    (Disponible, En Proceso o Adoptada).
+ * ============================================================================
+ */
 @Composable
 fun TarjetaMascota(
     mascota: Mascota,
@@ -47,8 +57,8 @@ fun TarjetaMascota(
                     .height(200.dp)
             ) {
                 AsyncImage(
-                    model = mascota.displayPhoto,
-                    contentDescription = "Foto de ${mascota.name}",
+                    model = mascota.fotoPrincipal,
+                    contentDescription = "Foto de ${mascota.nombre}",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxSize()
@@ -56,7 +66,7 @@ fun TarjetaMascota(
                 )
 
                 // Indicador de cantidad de fotos si tiene varias
-                if (mascota.photos.size > 1) {
+                if (mascota.fotos.size > 1) {
                     Surface(
                         color = Color.Black.copy(alpha = 0.6f),
                         shape = RoundedCornerShape(12.dp),
@@ -76,7 +86,7 @@ fun TarjetaMascota(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "${mascota.photos.size}",
+                                text = "${mascota.fotos.size}",
                                 color = Color.White,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
@@ -86,7 +96,7 @@ fun TarjetaMascota(
                 }
 
                 // Badge de Urgente sobre la foto (RF5)
-                if (mascota.isUrgent) {
+                if (mascota.esUrgente) {
                     Surface(
                         color = MaterialTheme.colorScheme.error,
                         shape = RoundedCornerShape(bottomEnd = 12.dp),
@@ -124,7 +134,7 @@ fun TarjetaMascota(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (mascota.species == "Perro") mascota.name + " 🐶" else mascota.name + " 🐱",
+                        text = if (mascota.especie == "Perro") "${mascota.nombre} 🐶" else "${mascota.nombre} 🐱",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -132,7 +142,7 @@ fun TarjetaMascota(
 
                     // Chip de sexo (Macho / Hembra) adaptado a modo oscuro y claro
                     val esOscuro = isSystemInDarkTheme()
-                    val esHembra = mascota.gender.equals("Hembra", ignoreCase = true)
+                    val esHembra = mascota.sexo.equals("Hembra", ignoreCase = true)
                     val fondoChip = if (esOscuro) {
                         if (esHembra) Color(0xFF4A1E2D) else Color(0xFF102A45)
                     } else {
@@ -149,7 +159,7 @@ fun TarjetaMascota(
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Text(
-                            text = mascota.gender,
+                            text = mascota.sexo,
                             color = textoChip,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
@@ -161,7 +171,7 @@ fun TarjetaMascota(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = "${mascota.species} • ${mascota.breed} • ${mascota.ageYears} ${if (mascota.ageYears == 1) "año" else "años"} • ${mascota.size}",
+                    text = "${mascota.especie} • ${mascota.raza} • ${mascota.edadAnios} ${if (mascota.edadAnios == 1) "año" else "años"} • ${mascota.tamano}",
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -179,15 +189,15 @@ fun TarjetaMascota(
                     )
                     Spacer(modifier = Modifier.width(2.dp))
                     Text(
-                        text = "${mascota.location} · ${mascota.shelterName}",
+                        text = "${mascota.ubicacion} · ${mascota.nombreRefugio}",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Medium
                     )
                 }
 
-                // Indicador de adoptada
-                if (mascota.status == EstadoMascota.ADOPTADA) {
+                // Indicador de estado (En Proceso o Adoptada)
+                if (mascota.estado == EstadoMascota.ADOPTADA) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Surface(
                         color = MaterialTheme.colorScheme.secondaryContainer,
@@ -196,6 +206,20 @@ fun TarjetaMascota(
                         Text(
                             text = "🎉 ¡Adoptada!",
                             color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                } else if (mascota.estado == EstadoMascota.EN_PROCESO) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Surface(
+                        color = Color(0xFFFFF8E1),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            text = "⏳ En proceso de adopción",
+                            color = Color(0xFFF57F17),
                             fontWeight = FontWeight.Bold,
                             fontSize = 12.sp,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)

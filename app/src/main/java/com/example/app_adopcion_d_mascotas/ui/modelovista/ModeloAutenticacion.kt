@@ -6,14 +6,23 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.app_adopcion_d_mascotas.datos.modelos.RolUsuario
-import com.example.app_adopcion_d_mascotas.datos.modelos.User
-import com.example.app_adopcion_d_mascotas.datos.modelos.UserRole
 import com.example.app_adopcion_d_mascotas.datos.modelos.Usuario
 import com.example.app_adopcion_d_mascotas.datos.repositorios.RepositorioAutenticacionAppwrite
 import kotlinx.coroutines.launch
 
+/*
+ * ============================================================================
+ * ARCHIVO: ModeloAutenticacion.kt
+ * CAPA: UI -> ModeloVista (ViewModel de RF1: Registro e Inicio de Sesión)
+ * ¿QUÉ HACE?: Es el "cerebro" de la pantalla de Login y Registro.
+ *             1. Valida que el correo, nombre y contraseña sean correctos.
+ *             2. Llama al Repositorio para guardar o consultar en Appwrite.
+ *             3. Guarda qué usuario está conectado y su rol (ADOPTANTE o REFUGIO).
+ * ============================================================================
+ */
 class ModeloAutenticacion : ViewModel() {
 
+    // 1. Estados observables por la pantalla
     var usuarioActual by mutableStateOf<Usuario?>(null)
         private set
 
@@ -23,41 +32,78 @@ class ModeloAutenticacion : ViewModel() {
     var mensajeError by mutableStateOf<String?>(null)
         private set
 
-    // Alias para compatibilidad
+    // Expresión regular simple y clara para validar correos electrónicos (ej. nombre@dominio.com)
+    private val patronCorreoValido = Regex("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")
+
+    // Alias de compatibilidad
     var currentUser: Usuario?
         get() = usuarioActual
         private set(value) { usuarioActual = value }
-
-    val isLoading: Boolean
-        get() = estaCargando
-
-    val errorMessage: String?
-        get() = mensajeError
+    val isLoading: Boolean get() = estaCargando
+    val errorMessage: String? get() = mensajeError
 
     init {
         verificarSesion()
     }
 
-    fun verificarSesion() {
+    /*
+     * Limpia el mensaje de error cuando el usuario empieza a escribir de nuevo
+     */
+    fun limpiarError() {
+        mensajeError = null
+    }
+
+    /*
+     * Verifica si ya existe una sesión activa en Appwrite Cloud al abrir la app
+     */
+    fun verificarSesion(alRecuperarSesion: ((Usuario) -> Unit)? = null) {
         viewModelScope.launch {
             estaCargando = true
-            usuarioActual = RepositorioAutenticacionAppwrite.getCurrentUser()
+            val usuarioRecuperado = RepositorioAutenticacionAppwrite.obtenerUsuarioActual()
+            usuarioActual = usuarioRecuperado
             estaCargando = false
+            if (usuarioRecuperado != null) {
+                alRecuperarSesion?.invoke(usuarioRecuperado)
+            }
         }
     }
 
     fun checkSession() = verificarSesion()
 
-    fun iniciarSesion(correo: String, contrasena: String, alTenerExito: (Usuario) -> Unit) {
-        if (correo.isBlank() || contrasena.isBlank()) {
-            mensajeError = "Por favor ingresa correo y contraseña"
+    /*
+     * RF1: Iniciar sesión validando primero los datos escritos por el usuario
+     */
+    fun iniciarSesion(
+        correo: String,
+        contrasena: String,
+        alTenerExito: (Usuario) -> Unit
+    ) {
+        val correoLimpio = correo.trim()
+
+        // Paso 1: Validar que no haya campos vacíos
+        if (correoLimpio.isEmpty() || contrasena.isEmpty()) {
+            mensajeError = "Por favor, ingresa tu correo electrónico y contraseña."
             return
         }
 
+        // Paso 2: Validar que el correo tenga formato válido (@ y dominio)
+        if (!patronCorreoValido.matches(correoLimpio)) {
+            mensajeError = "Ingresa un correo electrónico válido (ejemplo: usuario@correo.com)."
+            return
+        }
+
+        // Paso 3: Validar longitud mínima de contraseña
+        if (contrasena.length < 8) {
+            mensajeError = "La contraseña debe tener al menos 8 caracteres."
+            return
+        }
+
+        // Paso 4: Conectar con Appwrite Cloud para iniciar sesión
         viewModelScope.launch {
             estaCargando = true
             mensajeError = null
-            val resultado = RepositorioAutenticacionAppwrite.login(correo.trim(), contrasena)
+
+            val resultado = RepositorioAutenticacionAppwrite.iniciarSesion(correoLimpio, contrasena)
             estaCargando = false
 
             resultado.fold(
@@ -66,7 +112,7 @@ class ModeloAutenticacion : ViewModel() {
                     alTenerExito(usuario)
                 },
                 onFailure = { error ->
-                    mensajeError = "Error al iniciar sesión: ${error.message ?: "Credenciales incorrectas"}"
+                    mensajeError = traducirErrorAppwrite(error.message)
                 }
             )
         }
@@ -75,29 +121,63 @@ class ModeloAutenticacion : ViewModel() {
     fun login(email: String, password: String, onSuccess: (Usuario) -> Unit) =
         iniciarSesion(email, password, onSuccess)
 
-    fun registrarse(nombre: String, correo: String, contrasena: String, rol: RolUsuario, alTenerExito: (Usuario) -> Unit) {
-        if (nombre.isBlank() || correo.isBlank() || contrasena.isBlank()) {
-            mensajeError = "Completa todos los campos"
-            return
-        }
-        if (contrasena.length < 8) {
-            mensajeError = "La contraseña debe tener al menos 8 caracteres"
+    /*
+     * RF1: Registrar una nueva cuenta (ADOPTANTE o REFUGIO) en Appwrite Cloud
+     */
+    fun registrarse(
+        nombre: String,
+        correo: String,
+        contrasena: String,
+        rol: RolUsuario,
+        alTenerExito: (Usuario) -> Unit
+    ) {
+        val nombreLimpio = nombre.trim()
+        val correoLimpio = correo.trim()
+
+        // Paso 1: Validar que todos los campos estén completos
+        if (nombreLimpio.isEmpty() || correoLimpio.isEmpty() || contrasena.isEmpty()) {
+            mensajeError = "Por favor, completa tu nombre, correo y contraseña."
             return
         }
 
+        // Paso 2: Validar que el nombre tenga al menos 3 letras reales
+        if (nombreLimpio.length < 3) {
+            mensajeError = "El nombre debe tener al menos 3 caracteres."
+            return
+        }
+
+        // Paso 3: Validar formato de correo electrónico
+        if (!patronCorreoValido.matches(correoLimpio)) {
+            mensajeError = "El formato del correo no es válido (ejemplo: refugio@correo.com)."
+            return
+        }
+
+        // Paso 4: Validar que la contraseña tenga mínimo 8 caracteres (requisito de Appwrite)
+        if (contrasena.length < 8) {
+            mensajeError = "La contraseña debe tener mínimo 8 caracteres."
+            return
+        }
+
+        // Paso 5: Crear la cuenta y guardar su rol (ADOPTANTE o REFUGIO) en la tabla "usuarios"
         viewModelScope.launch {
             estaCargando = true
             mensajeError = null
-            val resultado = RepositorioAutenticacionAppwrite.register(nombre.trim(), correo.trim(), contrasena, rol)
+
+            val resultado = RepositorioAutenticacionAppwrite.registrarUsuario(
+                nombre = nombreLimpio,
+                correo = correoLimpio,
+                contrasena = contrasena,
+                rol = rol
+            )
             estaCargando = false
 
             resultado.fold(
-                onSuccess = { usuario ->
-                    usuarioActual = usuario
-                    alTenerExito(usuario)
+                onSuccess = { usuarioCreado ->
+                    usuarioActual = usuarioCreado
+                    alTenerExito(usuarioCreado)
                 },
                 onFailure = { error ->
-                    mensajeError = "Error al registrarse: ${error.message ?: "Intenta de nuevo"}"
+                    mensajeError = traducirErrorAppwrite(error.message)
                 }
             )
         }
@@ -106,61 +186,36 @@ class ModeloAutenticacion : ViewModel() {
     fun register(name: String, email: String, password: String, role: RolUsuario, onSuccess: (Usuario) -> Unit) =
         registrarse(name, email, password, role, onSuccess)
 
-    // RF1: Inicio de Sesión con Google
-    fun iniciarSesionConGoogle(alTenerExito: (Usuario) -> Unit) {
-        viewModelScope.launch {
-            estaCargando = true
-            mensajeError = null
-
-            try {
-                val existente = RepositorioAutenticacionAppwrite.getCurrentUser()
-                if (existente != null) {
-                    usuarioActual = existente
-                    estaCargando = false
-                    alTenerExito(existente)
-                    return@launch
-                }
-            } catch (_: Exception) {}
-
-            val usuarioGoogle = Usuario(
-                id = "google_user_${System.currentTimeMillis() % 10000}",
-                name = "Usuario Google",
-                email = "usuario.google@gmail.com",
-                role = RolUsuario.ADOPTANTE,
-                phone = "987654321",
-                bio = "Cuenta autenticada vía Google OAuth (RF1)",
-                avatarPhotoId = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80"
-            )
-            usuarioActual = usuarioGoogle
-            estaCargando = false
-            alTenerExito(usuarioGoogle)
-        }
-    }
-
-    fun loginWithGoogle(onSuccess: (Usuario) -> Unit) = iniciarSesionConGoogle(onSuccess)
-
-    // Acceso rápido de prueba
-    fun accesoRapidoDemo(rol: RolUsuario, alTenerExito: (Usuario) -> Unit) {
-        val usuarioDemo = if (rol == RolUsuario.REFUGIO) {
-            Usuario(id = "demo_refugio", name = "Huellitas del Norte", email = "refugio@huellitas.org", role = RolUsuario.REFUGIO)
-        } else {
-            Usuario(id = "demo_adoptante", name = "Nicolás Adoptante", email = "nicolas@adopta.pe", role = RolUsuario.ADOPTANTE)
-        }
-        usuarioActual = usuarioDemo
-        alTenerExito(usuarioDemo)
-    }
-
-    fun loginDemo(role: RolUsuario, onSuccess: (Usuario) -> Unit) = accesoRapidoDemo(role, onSuccess)
-
+    /*
+     * Cerrar la sesión actual en Appwrite Cloud
+     */
     fun cerrarSesion(alCerrar: () -> Unit) {
         viewModelScope.launch {
-            RepositorioAutenticacionAppwrite.logout()
+            RepositorioAutenticacionAppwrite.cerrarSesion()
             usuarioActual = null
             alCerrar()
         }
     }
 
     fun logout(onLoggedOut: () -> Unit) = cerrarSesion(onLoggedOut)
+
+    /*
+     * Traduce los mensajes técnicos de Appwrite a mensajes amigables en español para el usuario
+     */
+    private fun traducirErrorAppwrite(detalle: String?): String {
+        val texto = detalle?.lowercase() ?: ""
+        return when {
+            texto.contains("already exists") || texto.contains("409") ->
+                "Este correo ya está registrado. Cambia a 'Iniciar Sesión' para entrar con tu cuenta."
+            texto.contains("invalid credentials") || texto.contains("401") ->
+                "Correo o contraseña incorrectos. Verifica tus datos e inténtalo de nuevo."
+            texto.contains("rate limit") || texto.contains("429") ->
+                "Demasiados intentos seguidos. Espera unos segundos y vuelve a intentar."
+            texto.contains("network") || texto.contains("unable to resolve host") ->
+                "Sin conexión a internet. Revisa tu red Wi-Fi o datos móviles."
+            else -> "No se pudo completar la operación: ${detalle ?: "Verifica tus datos"}"
+        }
+    }
 }
 
 typealias AuthViewModel = ModeloAutenticacion

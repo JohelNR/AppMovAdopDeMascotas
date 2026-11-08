@@ -22,12 +22,11 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Pets
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.SettingsBrightness
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -46,14 +45,27 @@ import com.example.app_adopcion_d_mascotas.datos.modelos.AdoptionRequest
 import com.example.app_adopcion_d_mascotas.datos.modelos.Mascota
 import com.example.app_adopcion_d_mascotas.datos.modelos.Pet
 import com.example.app_adopcion_d_mascotas.datos.modelos.RolUsuario
-import com.example.app_adopcion_d_mascotas.datos.modelos.SolicitudAdopcion
 import com.example.app_adopcion_d_mascotas.datos.modelos.User
-import com.example.app_adopcion_d_mascotas.datos.modelos.UserRole
 import com.example.app_adopcion_d_mascotas.datos.modelos.Usuario
+import com.example.app_adopcion_d_mascotas.ui.componentes.RecortadorImagenDialogo
 import com.example.app_adopcion_d_mascotas.ui.modelovista.ModeloPerfil
-import com.example.app_adopcion_d_mascotas.ui.modelovista.ProfileViewModel
 import com.example.app_adopcion_d_mascotas.ui.pantallas.solicitudes.StatusChip
+import com.example.app_adopcion_d_mascotas.ui.theme.GestorTemaApp
+import com.example.app_adopcion_d_mascotas.ui.theme.ModoTemaVisual
 
+/*
+ * ============================================================================
+ * PANTALLA DE PERFIL DE USUARIO Y AJUSTE DE TEMA (RF2 y RF16)
+ * ============================================================================
+ * ¿Qué hace esta pantalla?
+ * 1. Muestra los datos del usuario autenticado desde la tabla `usuarios` (RF2).
+ * 2. Permite cambiar la foto de perfil pasando primero por el Recortador
+ *    Interactivo (zoom, encuadre y rotación) antes de subirla a `fotos_mascotas`.
+ * 3. Permite elegir entre Tema Automático, Claro u Oscuro (RF16).
+ * 4. Si es REFUGIO, muestra la cuadrícula de sus mascotas publicadas.
+ *    Si es ADOPTANTE, muestra sus solicitudes y botón directo al Chat (RF13).
+ * ============================================================================
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PantallaPerfil(
@@ -83,15 +95,17 @@ fun ProfileScreen(
     onBackClick: () -> Unit,
     onLogoutClick: () -> Unit,
     onPetClick: (String) -> Unit,
-    onChatClick: (String, String) -> Unit // chatId, receiverName
+    onChatClick: (String, String) -> Unit
 ) {
     val contexto = LocalContext.current
     val estadoSnackbar = remember { SnackbarHostState() }
 
+    // Paso 1: Cargar datos del perfil y publicaciones/solicitudes al entrar
     LaunchedEffect(currentUser) {
         profileViewModel.cargarPerfil(currentUser)
     }
 
+    // Paso 2: Mostrar avisos de éxito o validación en barra inferior
     LaunchedEffect(profileViewModel.mensajeEstado) {
         profileViewModel.mensajeEstado?.let { mensaje ->
             estadoSnackbar.showSnackbar(mensaje)
@@ -102,14 +116,32 @@ fun ProfileScreen(
     val usuario = profileViewModel.usuarioActual ?: currentUser
     var mostrarDialogoEditar by remember { mutableStateOf(false) }
 
-    // Lanzador PhotoPicker para foto de avatar (RF2)
+    // Estado para abrir el recortador de imagen al elegir nuevo avatar
+    var uriAvatarParaRecortar by remember { mutableStateOf<Uri?>(null) }
+
+    // Lanzador PhotoPicker para foto de perfil (RF2)
     val lanzadorSelectorFoto = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         if (uri != null) {
-            profileViewModel.seleccionarAvatar(uri)
-            mostrarDialogoEditar = true
+            uriAvatarParaRecortar = uri
         }
+    }
+
+    // Si el usuario eligió una foto, abrimos el recortador profesional
+    uriAvatarParaRecortar?.let { uriOriginal ->
+        RecortadorImagenDialogo(
+            uriImagenOriginal = uriOriginal,
+            titulo = "Ajustar Foto de Perfil",
+            alConfirmarRecorte = { uriRecortada ->
+                profileViewModel.seleccionarAvatar(uriRecortada)
+                uriAvatarParaRecortar = null
+                mostrarDialogoEditar = true
+            },
+            alCancelar = {
+                uriAvatarParaRecortar = null
+            }
+        )
     }
 
     Scaffold(
@@ -153,194 +185,236 @@ fun ProfileScreen(
                     .widthIn(max = 760.dp)
                     .fillMaxWidth()
             ) {
-            // CABECERA ESTILO INSTAGRAM (Avatar circular + Datos)
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-            ) {
-                Column(
+                // =========================================================
+                // 1. CABECERA DE PERFIL (Avatar circular + Rol + Tema RF16)
+                // =========================================================
+                Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    )
                 ) {
-                    // Avatar con badge de cámara flotante
-                    Box(
+                    Column(
                         modifier = Modifier
-                            .size(96.dp)
-                            .clickable {
-                                lanzadorSelectorFoto.launch(
-                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        // Avatar con botón de cámara flotante que abre el recortador
+                        Box(
+                            modifier = Modifier
+                                .size(92.dp)
+                                .clickable {
+                                    lanzadorSelectorFoto.launch(
+                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                    )
+                                }
+                        ) {
+                            AsyncImage(
+                                model = profileViewModel.uriAvatarSeleccionado ?: usuario.urlAvatar,
+                                contentDescription = "Foto de perfil",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(CircleShape)
+                                    .border(3.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                            )
+                            Surface(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .align(Alignment.BottomEnd),
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.primary,
+                                shadowElevation = 3.dp
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CameraAlt,
+                                    contentDescription = "Cambiar y recortar foto",
+                                    tint = Color.White,
+                                    modifier = Modifier
+                                        .padding(6.dp)
+                                        .fillMaxSize()
                                 )
                             }
-                    ) {
-                        AsyncImage(
-                            model = profileViewModel.selectedAvatarUri ?: usuario.avatarUrl,
-                            contentDescription = "Foto de perfil",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(CircleShape)
-                                .border(3.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            text = usuario.nombre,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold
                         )
+
+                        Text(
+                            text = usuario.correo,
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        // Chip de Rol (Adoptante o Refugio)
                         Surface(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .align(Alignment.BottomEnd),
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primary,
-                            shadowElevation = 3.dp
+                            color = if (usuario.rol == RolUsuario.REFUGIO)
+                                MaterialTheme.colorScheme.primaryContainer
+                            else
+                                MaterialTheme.colorScheme.secondaryContainer,
+                            shape = RoundedCornerShape(12.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.CameraAlt,
-                                contentDescription = "Cambiar foto",
-                                tint = Color.White,
-                                modifier = Modifier
-                                    .padding(6.dp)
-                                    .fillMaxSize()
+                            Text(
+                                text = if (usuario.rol == RolUsuario.REFUGIO) "🏠 Refugio Verificado" else "🐾 Adoptante Responsable",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (usuario.rol == RolUsuario.REFUGIO)
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                else
+                                    MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                             )
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Text(
-                        text = usuario.name,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    Text(
-                        text = usuario.email,
-                        fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    // Chip de Rol (Adoptante o Refugio)
-                    Surface(
-                        color = if (usuario.role == UserRole.REFUGIO)
-                            MaterialTheme.colorScheme.primaryContainer
-                        else
-                            MaterialTheme.colorScheme.secondaryContainer,
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text(
-                            text = if (usuario.role == UserRole.REFUGIO) "🏠 Refugio Verificado" else "🐾 Adoptante Responsable",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (usuario.role == UserRole.REFUGIO)
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            else
-                                MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                        )
-                    }
-
-                    if (usuario.bio.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = usuario.bio,
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-
-                    if (usuario.phone.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(imageVector = Icons.Default.Phone, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(text = usuario.phone, fontSize = 12.sp)
+                        if (usuario.biografia.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = usuario.biografia,
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Button(
-                        onClick = { mostrarDialogoEditar = true },
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(imageVector = Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Editar Perfil")
-                    }
-                }
-            }
-
-            // CONTENIDO DE LA PESTAÑA SEGÚN ROL (RF2)
-            if (usuario.role == UserRole.REFUGIO) {
-                Text(
-                    text = "Mis Publicaciones Activas (${profileViewModel.misMascotas.size})",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                )
-
-                if (profileViewModel.misMascotas.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("No has publicado mascotas aún.", color = MaterialTheme.colorScheme.outline)
-                    }
-                } else {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        contentPadding = PaddingValues(16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        items(profileViewModel.misMascotas) { mascota ->
-                            TarjetaCuadriculaMascota(pet = mascota, onClick = { onPetClick(mascota.id) })
+                        if (usuario.telefono.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(imageVector = Icons.Default.Phone, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(text = usuario.telefono, fontSize = 12.sp)
+                            }
                         }
-                    }
-                }
-            } else {
-                Text(
-                    text = "Mis Solicitudes de Adopción (${profileViewModel.misSolicitudes.size})",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                )
 
-                if (profileViewModel.misSolicitudes.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("No has enviado solicitudes aún.", color = MaterialTheme.colorScheme.outline)
-                    }
-                } else {
-                    LazyColumn(
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        items(profileViewModel.misSolicitudes) { solicitud ->
-                            TarjetaSolicitudAdoptante(
-                                request = solicitud,
-                                onChatClick = {
-                                    onChatClick("chat_${solicitud.petId}_${solicitud.applicantId}", solicitud.shelterName)
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Selector de Tema Oscuro / Claro / Automático (RF16)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            FilterChip(
+                                selected = GestorTemaApp.modoActual == ModoTemaVisual.AUTOMATICO,
+                                onClick = { GestorTemaApp.cambiarModo(contexto, ModoTemaVisual.AUTOMATICO) },
+                                label = { Text("Auto", fontSize = 11.sp) },
+                                leadingIcon = {
+                                    Icon(Icons.Default.SettingsBrightness, contentDescription = null, modifier = Modifier.size(14.dp))
                                 }
                             )
+                            FilterChip(
+                                selected = GestorTemaApp.modoActual == ModoTemaVisual.CLARO,
+                                onClick = { GestorTemaApp.cambiarModo(contexto, ModoTemaVisual.CLARO) },
+                                label = { Text("Claro", fontSize = 11.sp) },
+                                leadingIcon = {
+                                    Icon(Icons.Default.LightMode, contentDescription = null, modifier = Modifier.size(14.dp))
+                                }
+                            )
+                            FilterChip(
+                                selected = GestorTemaApp.modoActual == ModoTemaVisual.OSCURO,
+                                onClick = { GestorTemaApp.cambiarModo(contexto, ModoTemaVisual.OSCURO) },
+                                label = { Text("Oscuro", fontSize = 11.sp) },
+                                leadingIcon = {
+                                    Icon(Icons.Default.DarkMode, contentDescription = null, modifier = Modifier.size(14.dp))
+                                }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Button(
+                            onClick = { mostrarDialogoEditar = true },
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(imageVector = Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Editar Perfil")
+                        }
+                    }
+                }
+
+                // =========================================================
+                // 2. LISTADO INFERIOR SEGÚN EL ROL DEL USUARIO (RF2)
+                // =========================================================
+                if (usuario.rol == RolUsuario.REFUGIO) {
+                    Text(
+                        text = "Mis Publicaciones Activas (${profileViewModel.misMascotas.size})",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                    )
+
+                    if (profileViewModel.misMascotas.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("No has publicado mascotas aún.", color = MaterialTheme.colorScheme.outline)
+                        }
+                    } else {
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(2),
+                            contentPadding = PaddingValues(16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            items(profileViewModel.misMascotas) { mascota ->
+                                TarjetaCuadriculaMascota(pet = mascota, onClick = { onPetClick(mascota.id) })
+                            }
+                        }
+                    }
+                } else {
+                    Text(
+                        text = "Mis Solicitudes de Adopción (${profileViewModel.misSolicitudes.size})",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                    )
+
+                    if (profileViewModel.misSolicitudes.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("No has enviado solicitudes aún.", color = MaterialTheme.colorScheme.outline)
+                        }
+                    } else {
+                        LazyColumn(
+                            contentPadding = PaddingValues(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            items(profileViewModel.misSolicitudes) { solicitud ->
+                                TarjetaSolicitudAdoptante(
+                                    request = solicitud,
+                                    onChatClick = {
+                                        onChatClick(
+                                            "chat_${solicitud.idMascota}_${solicitud.idSolicitante}",
+                                            solicitud.nombreRefugio
+                                        )
+                                    }
+                                )
+                            }
                         }
                     }
                 }
             }
         }
     }
-}
 
-    // DIÁLOGO MODAL EDITAR PERFIL (Con soporte anti-teclado)
+    // Diálogo modal para editar nombre, teléfono y biografía
     if (mostrarDialogoEditar && usuario != null) {
         DialogoEditarPerfil(
             user = usuario,
-            avatarUri = profileViewModel.selectedAvatarUri,
             isSaving = profileViewModel.estaGuardando,
             onDismiss = { mostrarDialogoEditar = false },
             onSave = { nombre, telefono, biografia ->
-                profileViewModel.saveProfile(contexto, nombre, telefono, biografia) { usuarioActualizado ->
+                profileViewModel.guardarPerfil(contexto, nombre, telefono, biografia) { usuarioActualizado ->
                     mostrarDialogoEditar = false
                     onUserUpdated(usuarioActualizado)
                 }
@@ -359,16 +433,16 @@ fun TarjetaCuadriculaMascota(pet: Pet, onClick: () -> Unit) {
     ) {
         Column {
             AsyncImage(
-                model = pet.displayPhoto,
-                contentDescription = pet.name,
+                model = pet.fotoPrincipal,
+                contentDescription = pet.nombre,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(130.dp)
             )
             Column(modifier = Modifier.padding(8.dp)) {
-                Text(pet.name, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                Text("${pet.species} · ${pet.ageYears} años", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(pet.nombre, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text("${pet.especie} · ${pet.edadAnios} años", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -393,16 +467,16 @@ fun TarjetaSolicitudAdoptante(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = request.petName, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Text(text = "Refugio: ${request.shelterName}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(text = request.nombreMascota, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text(text = "Refugio: ${request.nombreRefugio}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(modifier = Modifier.height(4.dp))
-                StatusChip(status = request.status)
+                StatusChip(status = request.estado)
             }
 
             IconButton(onClick = onChatClick) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.Chat,
-                    contentDescription = "Chatear",
+                    contentDescription = "Chatear con el refugio",
                     tint = MaterialTheme.colorScheme.primary
                 )
             }
@@ -413,14 +487,13 @@ fun TarjetaSolicitudAdoptante(
 @Composable
 fun DialogoEditarPerfil(
     user: User,
-    avatarUri: Uri?,
     isSaving: Boolean,
     onDismiss: () -> Unit,
     onSave: (nombre: String, telefono: String, biografia: String) -> Unit
 ) {
-    var nombre by remember { mutableStateOf(user.name) }
-    var telefono by remember { mutableStateOf(user.phone) }
-    var biografia by remember { mutableStateOf(user.bio) }
+    var nombre by remember { mutableStateOf(user.nombre) }
+    var telefono by remember { mutableStateOf(user.telefono) }
+    var biografia by remember { mutableStateOf(user.biografia) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -429,7 +502,7 @@ fun DialogoEditarPerfil(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .imePadding() // Anti-teclado: la pantalla se adapta automáticamente
+                    .imePadding()
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
@@ -443,7 +516,10 @@ fun DialogoEditarPerfil(
 
                 OutlinedTextField(
                     value = telefono,
-                    onValueChange = { if (it.length <= 9) telefono = it },
+                    onValueChange = { nuevo ->
+                        val soloDigitos = nuevo.filter { it.isDigit() }
+                        if (soloDigitos.length <= 9) telefono = soloDigitos
+                    },
                     label = { Text("Teléfono de contacto (9 dígitos)") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,

@@ -6,21 +6,25 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.app_adopcion_d_mascotas.datos.modelos.AdoptionRequest
-import com.example.app_adopcion_d_mascotas.datos.modelos.Appointment
-import com.example.app_adopcion_d_mascotas.datos.modelos.AppointmentStatus
 import com.example.app_adopcion_d_mascotas.datos.modelos.Cita
 import com.example.app_adopcion_d_mascotas.datos.modelos.EstadoCita
 import com.example.app_adopcion_d_mascotas.datos.modelos.EstadoSolicitud
-import com.example.app_adopcion_d_mascotas.datos.modelos.RequestStatus
 import com.example.app_adopcion_d_mascotas.datos.modelos.RolUsuario
 import com.example.app_adopcion_d_mascotas.datos.modelos.SolicitudAdopcion
-import com.example.app_adopcion_d_mascotas.datos.modelos.User
 import com.example.app_adopcion_d_mascotas.datos.modelos.Usuario
 import com.example.app_adopcion_d_mascotas.datos.repositorios.RepositorioSolicitudesAppwrite
 import com.example.app_adopcion_d_mascotas.notificaciones.AyudanteNotificaciones
 import kotlinx.coroutines.launch
 
+/*
+ * ============================================================================
+ * ARCHIVO: ModeloSolicitudes.kt
+ * CAPA: UI -> ModeloVista (ViewModel de RF8, RF9, RF10, RF14 y RF20)
+ * ¿QUÉ HACE?: Gestiona el envío y consulta de solicitudes de adopción,
+ *             la aprobación con efecto en cascada y la agenda de citas
+ *             presenciales o por videollamada en Appwrite Cloud.
+ * ============================================================================
+ */
 class ModeloSolicitudes : ViewModel() {
 
     var listaSolicitudes by mutableStateOf<List<SolicitudAdopcion>>(emptyList())
@@ -34,29 +38,30 @@ class ModeloSolicitudes : ViewModel() {
 
     var mensajeRespuesta by mutableStateOf<String?>(null)
 
-    // Alias para compatibilidad
+    // Alias de compatibilidad
     var requestsList: List<SolicitudAdopcion>
         get() = listaSolicitudes
         private set(value) { listaSolicitudes = value }
-
     var appointmentsList: List<Cita>
         get() = listaCitas
         private set(value) { listaCitas = value }
-
     val isLoading: Boolean get() = estaCargando
     var feedbackMessage: String?
         get() = mensajeRespuesta
         set(value) { mensajeRespuesta = value }
 
+    /*
+     * RF9: Carga las solicitudes desde la tabla "solicitudes" según el rol del usuario conectado
+     */
     fun cargarSolicitudes(usuarioActual: Usuario?) {
         if (usuarioActual == null) return
 
         viewModelScope.launch {
             estaCargando = true
-            listaSolicitudes = if (usuarioActual.role == RolUsuario.REFUGIO) {
-                RepositorioSolicitudesAppwrite.getRequestsForShelter(usuarioActual.name)
+            listaSolicitudes = if (usuarioActual.rol == RolUsuario.REFUGIO) {
+                RepositorioSolicitudesAppwrite.obtenerSolicitudesRefugio(usuarioActual.nombre)
             } else {
-                RepositorioSolicitudesAppwrite.getRequestsForApplicant(usuarioActual.id)
+                RepositorioSolicitudesAppwrite.obtenerSolicitudesAdoptante(usuarioActual.id)
             }
             cargarCitas(usuarioActual)
             estaCargando = false
@@ -65,15 +70,21 @@ class ModeloSolicitudes : ViewModel() {
 
     fun loadRequests(currentUser: Usuario?) = cargarSolicitudes(currentUser)
 
+    /*
+     * RF20: Carga las citas desde la tabla "citas" de Appwrite Cloud
+     */
     fun cargarCitas(usuarioActual: Usuario?) {
         if (usuarioActual == null) return
         viewModelScope.launch {
-            listaCitas = RepositorioSolicitudesAppwrite.getAppointments(usuarioActual.name)
+            listaCitas = RepositorioSolicitudesAppwrite.obtenerCitas(usuarioActual.nombre)
         }
     }
 
     fun loadAppointments(currentUser: Usuario?) = cargarCitas(currentUser)
 
+    /*
+     * RF8: Valida y envía una nueva solicitud de adopción a Appwrite Cloud
+     */
     fun enviarSolicitudAdopcion(
         idMascota: String,
         nombreMascota: String,
@@ -86,47 +97,63 @@ class ModeloSolicitudes : ViewModel() {
         contexto: Context? = null,
         alTenerExito: () -> Unit
     ) {
-        if (motivo.isBlank()) {
-            mensajeRespuesta = "Por favor explica por qué deseas adoptar"
+        val motivoLimpio = motivo.trim()
+
+        // Paso 1: Validar motivo con longitud mínima coherente
+        if (motivoLimpio.length < 10) {
+            mensajeRespuesta = "Por favor, explica con más detalle por qué deseas adoptar (mínimo 10 caracteres)."
             return
         }
+
+        // Paso 2: Validar aceptación del compromiso responsable
         if (!terminosAceptados) {
-            mensajeRespuesta = "Debes aceptar el compromiso de tenencia responsable"
+            mensajeRespuesta = "Debes aceptar el compromiso de tenencia responsable y seguimiento."
             return
         }
 
         viewModelScope.launch {
             estaCargando = true
+            mensajeRespuesta = null
+
+            // Paso 3: Verificar que no haya enviado ya una solicitud para esta misma mascota
+            val duplicada = RepositorioSolicitudesAppwrite.yaExisteSolicitud(idMascota, postulante.id)
+            if (duplicada) {
+                estaCargando = false
+                mensajeRespuesta = "Ya enviaste una solicitud anteriormente para adoptar a $nombreMascota."
+                return@launch
+            }
+
+            // Paso 4: Construir la solicitud y guardarla en la tabla "solicitudes"
             val solicitud = SolicitudAdopcion(
                 petId = idMascota,
                 petName = nombreMascota,
                 applicantId = postulante.id,
-                applicantName = postulante.name,
-                applicantEmail = postulante.email,
+                applicantName = postulante.nombre,
+                applicantEmail = postulante.correo,
                 shelterName = nombreRefugio,
-                reason = motivo.trim(),
+                reason = motivoLimpio,
                 hasYard = tienePatio,
                 hasExperience = tieneExperiencia,
                 termsAccepted = terminosAceptados,
                 status = EstadoSolicitud.PENDIENTE
             )
 
-            val exito = RepositorioSolicitudesAppwrite.createRequest(solicitud)
+            val exito = RepositorioSolicitudesAppwrite.crearSolicitud(solicitud)
             estaCargando = false
 
             if (exito) {
-                mensajeRespuesta = "¡Solicitud enviada con éxito!"
+                mensajeRespuesta = "¡Solicitud enviada con éxito al refugio $nombreRefugio!"
                 contexto?.let { ctx ->
                     AyudanteNotificaciones.showNotification(
                         context = ctx,
                         notificationId = 1001,
-                        title = "🐾 Solicitud Enviada",
-                        message = "Tu solicitud para adoptar a $nombreMascota ha sido registrada con éxito."
+                        title = "🐾 Solicitud Registrada",
+                        message = "Tu solicitud para adoptar a $nombreMascota fue enviada a $nombreRefugio."
                     )
                 }
                 alTenerExito()
             } else {
-                mensajeRespuesta = "Error al enviar la solicitud a la nube"
+                mensajeRespuesta = "Error al guardar la solicitud en Appwrite Cloud."
             }
         }
     }
@@ -155,26 +182,34 @@ class ModeloSolicitudes : ViewModel() {
         alTenerExito = onSuccess
     )
 
-    fun aceptarSolicitud(solicitud: SolicitudAdopcion, usuarioActual: Usuario?, contexto: Context? = null, alTenerExito: () -> Unit) {
+    /*
+     * RF10: Aprueba la solicitud, marca la mascota como ADOPTADA y descarta las demás en cascada
+     */
+    fun aceptarSolicitud(
+        solicitud: SolicitudAdopcion,
+        usuarioActual: Usuario?,
+        contexto: Context? = null,
+        alTenerExito: () -> Unit
+    ) {
         viewModelScope.launch {
             estaCargando = true
-            val exito = RepositorioSolicitudesAppwrite.acceptRequest(solicitud.id, solicitud.petId)
+            val exito = RepositorioSolicitudesAppwrite.aceptarSolicitud(solicitud.id, solicitud.idMascota)
             estaCargando = false
 
             if (exito) {
-                mensajeRespuesta = "¡Solicitud aceptada! Mascota marcada como ADOPTADA automáticamente."
+                mensajeRespuesta = "¡Adopción aprobada! ${solicitud.nombreMascota} pasó a estado ADOPTADA."
                 contexto?.let { ctx ->
                     AyudanteNotificaciones.showNotification(
                         context = ctx,
                         notificationId = 1002,
-                        title = "🎉 ¡Adopción Confirmada!",
-                        message = "La adopción de ${solicitud.petName} fue formalizada con éxito."
+                        title = "🎉 ¡Adopción Aprobada!",
+                        message = "Se aprobó la adopción de ${solicitud.nombreMascota} para ${solicitud.nombreSolicitante}."
                     )
                 }
                 cargarSolicitudes(usuarioActual)
                 alTenerExito()
             } else {
-                mensajeRespuesta = "Error al aceptar la solicitud"
+                mensajeRespuesta = "No se pudo aprobar la solicitud en la nube."
             }
         }
     }
@@ -182,23 +217,29 @@ class ModeloSolicitudes : ViewModel() {
     fun acceptRequest(request: SolicitudAdopcion, currentUser: Usuario?, context: Context? = null, onSuccess: () -> Unit) =
         aceptarSolicitud(request, currentUser, context, onSuccess)
 
+    /*
+     * RF10: Rechaza una solicitud de adopción
+     */
     fun rechazarSolicitud(idSolicitud: String, usuarioActual: Usuario?) {
         viewModelScope.launch {
             estaCargando = true
-            val exito = RepositorioSolicitudesAppwrite.rejectRequest(idSolicitud)
+            val exito = RepositorioSolicitudesAppwrite.rechazarSolicitud(idSolicitud)
             estaCargando = false
 
             if (exito) {
-                mensajeRespuesta = "Solicitud rechazada"
+                mensajeRespuesta = "Solicitud rechazada correctamente."
                 cargarSolicitudes(usuarioActual)
             } else {
-                mensajeRespuesta = "Error al rechazar solicitud"
+                mensajeRespuesta = "Error al rechazar la solicitud."
             }
         }
     }
 
     fun rejectRequest(requestId: String, currentUser: Usuario?) = rechazarSolicitud(requestId, currentUser)
 
+    /*
+     * RF20: Agenda una cita presencial o virtual en la tabla "citas" de Appwrite Cloud
+     */
     fun agendarCita(
         idSolicitud: String,
         nombreMascota: String,
@@ -211,49 +252,52 @@ class ModeloSolicitudes : ViewModel() {
         contexto: Context? = null,
         alTenerExito: () -> Unit
     ) {
-        if (fecha.isBlank() || hora.isBlank()) {
-            mensajeRespuesta = "Por favor ingresa fecha y hora de la cita"
+        val fechaLimpia = fecha.trim()
+        val horaLimpia = hora.trim()
+
+        if (fechaLimpia.isEmpty() || horaLimpia.isEmpty()) {
+            mensajeRespuesta = "Por favor, selecciona la fecha y la hora de la entrevista."
             return
         }
 
         viewModelScope.launch {
             estaCargando = true
-            val cita = Cita(
+            val nuevaCita = Cita(
                 requestId = idSolicitud,
                 petName = nombreMascota,
                 applicantName = nombrePostulante,
                 shelterName = nombreRefugio,
-                date = fecha,
-                time = hora,
+                date = fechaLimpia,
+                time = horaLimpia,
                 modality = modalidad,
                 status = EstadoCita.PROPUESTA
             )
 
-            val exito = RepositorioSolicitudesAppwrite.createAppointment(cita)
+            val exito = RepositorioSolicitudesAppwrite.crearCita(nuevaCita)
             estaCargando = false
 
             if (exito) {
-                mensajeRespuesta = "Cita agendada con éxito"
+                mensajeRespuesta = "Cita agendada con éxito para el $fechaLimpia a las $horaLimpia."
                 contexto?.let { ctx ->
                     AyudanteNotificaciones.showNotification(
                         context = ctx,
                         notificationId = 1003,
-                        title = "📅 Cita Agendada",
-                        message = "Cita con $nombreRefugio para $nombreMascota agendada para el $fecha a las $hora."
+                        title = "📅 Cita Programada",
+                        message = "Entrevista ($modalidad) para $nombreMascota el $fechaLimpia a las $horaLimpia."
                     )
                     AyudanteNotificaciones.scheduleAppointmentAlarm(
                         context = ctx,
-                        appointmentId = cita.id.ifEmpty { System.currentTimeMillis().toString() },
+                        appointmentId = System.currentTimeMillis().toString(),
                         petName = nombreMascota,
                         shelterName = nombreRefugio,
-                        date = fecha,
-                        time = hora
+                        date = fechaLimpia,
+                        time = horaLimpia
                     )
                 }
                 cargarCitas(usuarioActual)
                 alTenerExito()
             } else {
-                mensajeRespuesta = "Error al guardar la cita"
+                mensajeRespuesta = "Error al guardar la cita en Appwrite Cloud."
             }
         }
     }
@@ -282,14 +326,43 @@ class ModeloSolicitudes : ViewModel() {
         alTenerExito = onSuccess
     )
 
+    /*
+     * RF20: El adoptante confirma su asistencia a la cita propuesta
+     */
     fun confirmarCita(idCita: String, usuarioActual: Usuario?) {
         viewModelScope.launch {
-            RepositorioSolicitudesAppwrite.updateAppointmentStatus(idCita, EstadoCita.CONFIRMADA)
+            val exito = RepositorioSolicitudesAppwrite.actualizarEstadoCita(idCita, EstadoCita.CONFIRMADA)
+            if (exito) {
+                mensajeRespuesta = "¡Cita confirmada con éxito!"
+            }
             cargarCitas(usuarioActual)
         }
     }
 
     fun confirmAppointment(appointmentId: String, currentUser: Usuario?) = confirmarCita(appointmentId, currentUser)
+
+    /*
+     * RF20: Permite solicitar reprogramación de una cita proponiendo nueva fecha y hora
+     */
+    fun reprogramarCita(
+        idCita: String,
+        nuevaFecha: String,
+        nuevaHora: String,
+        usuarioActual: Usuario?
+    ) {
+        viewModelScope.launch {
+            val exito = RepositorioSolicitudesAppwrite.actualizarEstadoCita(
+                idCita = idCita,
+                nuevoEstado = EstadoCita.REPROGRAMAR,
+                nuevaFecha = nuevaFecha,
+                nuevaHora = nuevaHora
+            )
+            if (exito) {
+                mensajeRespuesta = "Se actualizó la cita a nueva fecha: $nuevaFecha ($nuevaHora)."
+            }
+            cargarCitas(usuarioActual)
+        }
+    }
 }
 
 typealias RequestsViewModel = ModeloSolicitudes

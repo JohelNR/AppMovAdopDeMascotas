@@ -1,12 +1,8 @@
 package com.example.app_adopcion_d_mascotas.datos.repositorios
 
-import com.example.app_adopcion_d_mascotas.datos.modelos.AdoptionRequest
-import com.example.app_adopcion_d_mascotas.datos.modelos.Appointment
-import com.example.app_adopcion_d_mascotas.datos.modelos.AppointmentStatus
 import com.example.app_adopcion_d_mascotas.datos.modelos.Cita
 import com.example.app_adopcion_d_mascotas.datos.modelos.EstadoCita
 import com.example.app_adopcion_d_mascotas.datos.modelos.EstadoSolicitud
-import com.example.app_adopcion_d_mascotas.datos.modelos.RequestStatus
 import com.example.app_adopcion_d_mascotas.datos.modelos.SolicitudAdopcion
 import com.example.app_adopcion_d_mascotas.datos.remoto.ClienteAppwrite
 import io.appwrite.ID
@@ -15,253 +11,340 @@ import io.appwrite.models.Document
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/*
+ * ============================================================================
+ * ARCHIVO: RepositorioSolicitudesAppwrite.kt
+ * CAPA: Datos -> Repositorios (RF8, RF9, RF10 y RF20)
+ * ¿QUÉ HACE?: Gestiona las tablas "solicitudes" y "citas" en Appwrite Cloud
+ *             con todas las columnas en español:
+ *             - Tabla "solicitudes": idMascota, nombreMascota, idSolicitante,
+ *               nombreSolicitante, correoSolicitante, nombreRefugio, motivo,
+ *               tienePatio, tieneExperiencia, aceptaTerminos, estado.
+ *             - Tabla "citas": idSolicitud, nombreMascota, nombreSolicitante,
+ *               nombreRefugio, fecha, hora, modalidad, estado.
+ * ============================================================================
+ */
 object RepositorioSolicitudesAppwrite {
 
-    // RF8: Enviar formulario de solicitud
-    suspend fun createRequest(request: SolicitudAdopcion): Boolean = withContext(Dispatchers.IO) {
+    /*
+     * RF8: Verifica si el adoptante ya envió antes una solicitud para la misma mascota
+     * para evitar solicitudes duplicadas.
+     */
+    suspend fun yaExisteSolicitud(idMascota: String, idSolicitante: String): Boolean = withContext(Dispatchers.IO) {
         try {
-            val data = mapOf(
-                "petId" to request.petId,
-                "petName" to request.petName,
-                "applicantId" to request.applicantId,
-                "applicantName" to request.applicantName,
-                "applicantEmail" to request.applicantEmail,
-                "shelterNames" to request.shelterName, // Clave de Appwrite
-                "reason" to request.reason,
-                "hasYard" to request.hasYard,
-                "hasExperience" to request.hasExperience,
-                "termsAccepted" to request.termsAccepted,
-                "status" to request.status.name
+            val respuesta = ClienteAppwrite.baseDeDatos.listDocuments(
+                databaseId = ClienteAppwrite.ID_BASE_DATOS,
+                collectionId = ClienteAppwrite.TABLA_SOLICITUDES,
+                queries = listOf(
+                    Query.equal("idMascota", idMascota),
+                    Query.equal("idSolicitante", idSolicitante)
+                )
             )
-            ClienteAppwrite.databases.createDocument(
-                databaseId = ClienteAppwrite.DATABASE_ID,
-                collectionId = ClienteAppwrite.REQUESTS_COLLECTION,
-                documentId = ID.unique(),
-                data = data
-            )
-            true
-        } catch (e: Exception) {
-            e.printStackTrace()
+            respuesta.documents.isNotEmpty()
+        } catch (_: Exception) {
             false
         }
     }
 
-    suspend fun crearSolicitud(solicitud: SolicitudAdopcion): Boolean = createRequest(solicitud)
-
-    // RF9: Listar solicitudes recibidas para el refugio
-    suspend fun getRequestsForShelter(shelterName: String): List<SolicitudAdopcion> = withContext(Dispatchers.IO) {
+    /*
+     * RF8: Enviar una nueva solicitud de adopción a la tabla "solicitudes".
+     */
+    suspend fun crearSolicitud(solicitud: SolicitudAdopcion): Boolean = withContext(Dispatchers.IO) {
         try {
-            val response = ClienteAppwrite.databases.listDocuments(
-                databaseId = ClienteAppwrite.DATABASE_ID,
-                collectionId = ClienteAppwrite.REQUESTS_COLLECTION,
-                queries = listOf(
-                    Query.orderDesc("\$createdAt")
-                )
+            // Paso 1: Preparar los datos con los nombres de columna en español
+            val datosSolicitud = mapOf(
+                "idMascota" to solicitud.idMascota,
+                "nombreMascota" to solicitud.nombreMascota,
+                "idSolicitante" to solicitud.idSolicitante,
+                "nombreSolicitante" to solicitud.nombreSolicitante,
+                "correoSolicitante" to solicitud.correoSolicitante,
+                "nombreRefugio" to solicitud.nombreRefugio,
+                "motivo" to solicitud.motivo.trim(),
+                "tienePatio" to solicitud.tienePatio,
+                "tieneExperiencia" to solicitud.tieneExperiencia,
+                "aceptaTerminos" to solicitud.aceptaTerminos,
+                "estado" to solicitud.estado.name
             )
-            val cleanTarget = shelterName.trim()
-            val allRequests = response.documents.map { docToRequest(it) }
-            if (cleanTarget.isNotBlank()) {
-                val filtered = allRequests.filter { 
-                    it.shelterName.trim().equals(cleanTarget, ignoreCase = true) ||
-                    cleanTarget.contains(it.shelterName.trim(), ignoreCase = true) ||
-                    it.shelterName.trim().contains(cleanTarget, ignoreCase = true)
+
+            // Paso 2: Crear el documento en Appwrite Cloud
+            ClienteAppwrite.baseDeDatos.createDocument(
+                databaseId = ClienteAppwrite.ID_BASE_DATOS,
+                collectionId = ClienteAppwrite.TABLA_SOLICITUDES,
+                documentId = ID.unique(),
+                data = datosSolicitud
+            )
+            true
+        } catch (error: Exception) {
+            error.printStackTrace()
+            false
+        }
+    }
+
+    suspend fun createRequest(request: SolicitudAdopcion): Boolean = crearSolicitud(request)
+
+    /*
+     * RF9: Obtener las solicitudes recibidas por un Refugio desde la nube.
+     */
+    suspend fun obtenerSolicitudesRefugio(nombreRefugio: String): List<SolicitudAdopcion> = withContext(Dispatchers.IO) {
+        try {
+            val respuesta = ClienteAppwrite.baseDeDatos.listDocuments(
+                databaseId = ClienteAppwrite.ID_BASE_DATOS,
+                collectionId = ClienteAppwrite.TABLA_SOLICITUDES,
+                queries = listOf(Query.orderDesc("\$createdAt"))
+            )
+            val todas = respuesta.documents.map { documentoASolicitud(it) }
+            val refugioLimpio = nombreRefugio.trim()
+            if (refugioLimpio.isNotBlank()) {
+                val filtradas = todas.filter {
+                    it.nombreRefugio.trim().equals(refugioLimpio, ignoreCase = true) ||
+                        refugioLimpio.contains(it.nombreRefugio.trim(), ignoreCase = true) ||
+                        it.nombreRefugio.trim().contains(refugioLimpio, ignoreCase = true)
                 }
-                if (filtered.isNotEmpty()) filtered else allRequests
+                if (filtradas.isNotEmpty()) filtradas else todas
             } else {
-                allRequests
+                todas
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
+        } catch (error: Exception) {
+            error.printStackTrace()
             emptyList()
         }
     }
 
-    suspend fun obtenerSolicitudesRefugio(nombreRefugio: String): List<SolicitudAdopcion> = getRequestsForShelter(nombreRefugio)
+    suspend fun getRequestsForShelter(shelterName: String): List<SolicitudAdopcion> =
+        obtenerSolicitudesRefugio(shelterName)
 
-    // Listar solicitudes del adoptante
-    suspend fun getRequestsForApplicant(applicantId: String): List<SolicitudAdopcion> = withContext(Dispatchers.IO) {
+    /*
+     * RF9: Obtener las solicitudes enviadas por un Adoptante específico.
+     */
+    suspend fun obtenerSolicitudesAdoptante(idAdoptante: String): List<SolicitudAdopcion> = withContext(Dispatchers.IO) {
         try {
-            val response = ClienteAppwrite.databases.listDocuments(
-                databaseId = ClienteAppwrite.DATABASE_ID,
-                collectionId = ClienteAppwrite.REQUESTS_COLLECTION,
+            val respuesta = ClienteAppwrite.baseDeDatos.listDocuments(
+                databaseId = ClienteAppwrite.ID_BASE_DATOS,
+                collectionId = ClienteAppwrite.TABLA_SOLICITUDES,
                 queries = listOf(
-                    Query.equal("applicantId", applicantId),
+                    Query.equal("idSolicitante", idAdoptante),
                     Query.orderDesc("\$createdAt")
                 )
             )
-            response.documents.map { docToRequest(it) }
-        } catch (e: Exception) {
-            e.printStackTrace()
+            respuesta.documents.map { documentoASolicitud(it) }
+        } catch (error: Exception) {
+            error.printStackTrace()
             emptyList()
         }
     }
 
-    suspend fun obtenerSolicitudesAdoptante(idAdoptante: String): List<SolicitudAdopcion> = getRequestsForApplicant(idAdoptante)
+    suspend fun getRequestsForApplicant(applicantId: String): List<SolicitudAdopcion> =
+        obtenerSolicitudesAdoptante(applicantId)
 
-    // RF10: Aceptar solicitud -> Cierre automático de la mascota y descarte de pendientes
-    suspend fun acceptRequest(requestId: String, petId: String): Boolean = withContext(Dispatchers.IO) {
+    /*
+     * RF10: Aprobar solicitud con EFECTO EN CASCADA AUTOMÁTICO:
+     * 1. Marca la solicitud elegida como ACEPTADA.
+     * 2. Cambia el estado de la mascota a ADOPTADA en la tabla "mascotas".
+     * 3. Cambia todas las demás solicitudes pendientes de esa misma mascota a NO_DISPONIBLE.
+     */
+    suspend fun aceptarSolicitud(idSolicitud: String, idMascota: String): Boolean = withContext(Dispatchers.IO) {
         try {
-            // 1. Marcar la solicitud elegida como ACEPTADA
-            ClienteAppwrite.databases.updateDocument(
-                databaseId = ClienteAppwrite.DATABASE_ID,
-                collectionId = ClienteAppwrite.REQUESTS_COLLECTION,
-                documentId = requestId,
-                data = mapOf("status" to EstadoSolicitud.ACEPTADA.name)
+            // Paso 1: Marcar esta solicitud como ACEPTADA
+            ClienteAppwrite.baseDeDatos.updateDocument(
+                databaseId = ClienteAppwrite.ID_BASE_DATOS,
+                collectionId = ClienteAppwrite.TABLA_SOLICITUDES,
+                documentId = idSolicitud,
+                data = mapOf("estado" to EstadoSolicitud.ACEPTADA.name)
             )
 
-            // 2. Marcar la mascota como ADOPTADA (sale del catálogo)
-            RepositorioMascotasAppwrite.markAsAdopted(petId)
+            // Paso 2: Marcar la mascota como ADOPTADA para que ya no aparezca disponible
+            RepositorioMascotasAppwrite.marcarComoAdoptada(idMascota)
 
-            // 3. Buscar todas las demás solicitudes de esta misma mascota y ponerlas NO_DISPONIBLE
-            val otherRequests = ClienteAppwrite.databases.listDocuments(
-                databaseId = ClienteAppwrite.DATABASE_ID,
-                collectionId = ClienteAppwrite.REQUESTS_COLLECTION,
+            // Paso 3: Buscar otras solicitudes pendientes de esta misma mascota y cerrarlas en cascada
+            val otrasPendientes = ClienteAppwrite.baseDeDatos.listDocuments(
+                databaseId = ClienteAppwrite.ID_BASE_DATOS,
+                collectionId = ClienteAppwrite.TABLA_SOLICITUDES,
                 queries = listOf(
-                    Query.equal("petId", petId),
-                    Query.equal("status", EstadoSolicitud.PENDIENTE.name)
+                    Query.equal("idMascota", idMascota),
+                    Query.equal("estado", EstadoSolicitud.PENDIENTE.name)
                 )
             )
 
-            for (doc in otherRequests.documents) {
-                if (doc.id != requestId) {
-                    ClienteAppwrite.databases.updateDocument(
-                        databaseId = ClienteAppwrite.DATABASE_ID,
-                        collectionId = ClienteAppwrite.REQUESTS_COLLECTION,
+            for (doc in otrasPendientes.documents) {
+                if (doc.id != idSolicitud) {
+                    ClienteAppwrite.baseDeDatos.updateDocument(
+                        databaseId = ClienteAppwrite.ID_BASE_DATOS,
+                        collectionId = ClienteAppwrite.TABLA_SOLICITUDES,
                         documentId = doc.id,
-                        data = mapOf("status" to EstadoSolicitud.NO_DISPONIBLE.name)
+                        data = mapOf("estado" to EstadoSolicitud.NO_DISPONIBLE.name)
                     )
                 }
             }
             true
-        } catch (e: Exception) {
-            e.printStackTrace()
+        } catch (error: Exception) {
+            error.printStackTrace()
             false
         }
     }
 
-    suspend fun aceptarSolicitud(idSolicitud: String, idMascota: String): Boolean = acceptRequest(idSolicitud, idMascota)
+    suspend fun acceptRequest(requestId: String, petId: String): Boolean =
+        aceptarSolicitud(requestId, petId)
 
-    // Rechazar solicitud
-    suspend fun rejectRequest(requestId: String): Boolean = withContext(Dispatchers.IO) {
+    /*
+     * RF10: Rechazar una solicitud de adopción manualmente.
+     */
+    suspend fun rechazarSolicitud(idSolicitud: String): Boolean = withContext(Dispatchers.IO) {
         try {
-            ClienteAppwrite.databases.updateDocument(
-                databaseId = ClienteAppwrite.DATABASE_ID,
-                collectionId = ClienteAppwrite.REQUESTS_COLLECTION,
-                documentId = requestId,
-                data = mapOf("status" to EstadoSolicitud.RECHAZADA.name)
+            ClienteAppwrite.baseDeDatos.updateDocument(
+                databaseId = ClienteAppwrite.ID_BASE_DATOS,
+                collectionId = ClienteAppwrite.TABLA_SOLICITUDES,
+                documentId = idSolicitud,
+                data = mapOf("estado" to EstadoSolicitud.RECHAZADA.name)
             )
             true
-        } catch (e: Exception) {
-            e.printStackTrace()
+        } catch (error: Exception) {
+            error.printStackTrace()
             false
         }
     }
 
-    suspend fun rechazarSolicitud(idSolicitud: String): Boolean = rejectRequest(idSolicitud)
+    suspend fun rejectRequest(requestId: String): Boolean = rechazarSolicitud(requestId)
 
-    // RF20: Crear cita / entrevista
-    suspend fun createAppointment(appointment: Cita): Boolean = withContext(Dispatchers.IO) {
+    /*
+     * RF20: Agendar una cita o entrevista en la tabla "citas" de Appwrite Cloud.
+     */
+    suspend fun crearCita(cita: Cita): Boolean = withContext(Dispatchers.IO) {
         try {
-            val data = mapOf(
-                "requestId" to appointment.requestId,
-                "petName" to appointment.petName,
-                "applicantName" to appointment.applicantName,
-                "shelterName" to appointment.shelterName,
-                "date" to appointment.date,
-                "time" to appointment.time,
-                "modality" to appointment.modality,
-                "status" to appointment.status.name
+            val datosCita = mapOf(
+                "idSolicitud" to cita.idSolicitud,
+                "nombreMascota" to cita.nombreMascota,
+                "nombreSolicitante" to cita.nombreSolicitante,
+                "nombreRefugio" to cita.nombreRefugio,
+                "fecha" to cita.fecha,
+                "hora" to cita.hora,
+                "modalidad" to cita.modalidad,
+                "estado" to cita.estado.name
             )
-            ClienteAppwrite.databases.createDocument(
-                databaseId = ClienteAppwrite.DATABASE_ID,
-                collectionId = ClienteAppwrite.APPOINTMENTS_COLLECTION,
+            ClienteAppwrite.baseDeDatos.createDocument(
+                databaseId = ClienteAppwrite.ID_BASE_DATOS,
+                collectionId = ClienteAppwrite.TABLA_CITAS,
                 documentId = ID.unique(),
-                data = data
+                data = datosCita
             )
             true
-        } catch (e: Exception) {
-            e.printStackTrace()
+        } catch (error: Exception) {
+            error.printStackTrace()
             false
         }
     }
 
-    suspend fun crearCita(cita: Cita): Boolean = createAppointment(cita)
+    suspend fun createAppointment(appointment: Cita): Boolean = crearCita(appointment)
 
-    // Listar citas para un refugio o adoptante
-    suspend fun getAppointments(shelterOrApplicantName: String): List<Cita> = withContext(Dispatchers.IO) {
+    /*
+     * RF20: Obtener las citas programadas de un refugio o de un adoptante.
+     */
+    suspend fun obtenerCitas(nombreUsuario: String): List<Cita> = withContext(Dispatchers.IO) {
         try {
-            val response = ClienteAppwrite.databases.listDocuments(
-                databaseId = ClienteAppwrite.DATABASE_ID,
-                collectionId = ClienteAppwrite.APPOINTMENTS_COLLECTION,
+            val respuesta = ClienteAppwrite.baseDeDatos.listDocuments(
+                databaseId = ClienteAppwrite.ID_BASE_DATOS,
+                collectionId = ClienteAppwrite.TABLA_CITAS,
                 queries = listOf(Query.orderDesc("\$createdAt"))
             )
-            response.documents.map { docToAppointment(it) }.filter {
-                it.shelterName.equals(shelterOrApplicantName, ignoreCase = true) ||
-                it.applicantName.equals(shelterOrApplicantName, ignoreCase = true)
+            val todas = respuesta.documents.map { documentoACita(it) }
+            val nombreLimpio = nombreUsuario.trim()
+            if (nombreLimpio.isNotBlank()) {
+                val filtradas = todas.filter {
+                    it.nombreRefugio.trim().equals(nombreLimpio, ignoreCase = true) ||
+                        it.nombreSolicitante.trim().equals(nombreLimpio, ignoreCase = true)
+                }
+                if (filtradas.isNotEmpty()) filtradas else todas
+            } else {
+                todas
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
+        } catch (error: Exception) {
+            error.printStackTrace()
             emptyList()
         }
     }
 
-    suspend fun obtenerCitas(nombreRefugioOPostulante: String): List<Cita> = getAppointments(nombreRefugioOPostulante)
+    suspend fun getAppointments(shelterOrApplicantName: String): List<Cita> =
+        obtenerCitas(shelterOrApplicantName)
 
-    // Actualizar estado de la cita
-    suspend fun updateAppointmentStatus(appointmentId: String, newStatus: EstadoCita): Boolean = withContext(Dispatchers.IO) {
+    /*
+     * RF20: Cambiar el estado de una cita (CONFIRMADA, REPROGRAMAR o RECHAZADA) y opcionalmente su fecha/hora.
+     */
+    suspend fun actualizarEstadoCita(
+        idCita: String,
+        nuevoEstado: EstadoCita,
+        nuevaFecha: String? = null,
+        nuevaHora: String? = null
+    ): Boolean = withContext(Dispatchers.IO) {
         try {
-            ClienteAppwrite.databases.updateDocument(
-                databaseId = ClienteAppwrite.DATABASE_ID,
-                collectionId = ClienteAppwrite.APPOINTMENTS_COLLECTION,
-                documentId = appointmentId,
-                data = mapOf("status" to newStatus.name)
+            val datos = mutableMapOf<String, Any>("estado" to nuevoEstado.name)
+            if (!nuevaFecha.isNullOrBlank()) datos["fecha"] = nuevaFecha.trim()
+            if (!nuevaHora.isNullOrBlank()) datos["hora"] = nuevaHora.trim()
+
+            ClienteAppwrite.baseDeDatos.updateDocument(
+                databaseId = ClienteAppwrite.ID_BASE_DATOS,
+                collectionId = ClienteAppwrite.TABLA_CITAS,
+                documentId = idCita,
+                data = datos
             )
             true
-        } catch (e: Exception) {
-            e.printStackTrace()
+        } catch (error: Exception) {
+            error.printStackTrace()
             false
         }
     }
 
-    suspend fun actualizarEstadoCita(idCita: String, nuevoEstado: EstadoCita): Boolean = updateAppointmentStatus(idCita, nuevoEstado)
+    suspend fun updateAppointmentStatus(appointmentId: String, newStatus: EstadoCita): Boolean =
+        actualizarEstadoCita(appointmentId, newStatus)
 
-    private fun docToRequest(doc: Document<Map<String, Any>>): SolicitudAdopcion {
-        val data = doc.data
-        val statusStr = data["status"]?.toString() ?: "PENDIENTE"
-        val status = try { EstadoSolicitud.valueOf(statusStr) } catch (_: Exception) { EstadoSolicitud.PENDIENTE }
-        val shelter = data["shelterNames"]?.toString() ?: data["shelterName"]?.toString() ?: ""
+    /*
+     * Traduce un documento de la tabla "solicitudes" al modelo SolicitudAdopcion.
+     */
+    private fun documentoASolicitud(documento: Document<Map<String, Any>>): SolicitudAdopcion {
+        val datos = documento.data
+        val textoEstado = datos["estado"]?.toString() ?: "PENDIENTE"
+        val estado = try {
+            EstadoSolicitud.valueOf(textoEstado)
+        } catch (_: Exception) {
+            EstadoSolicitud.PENDIENTE
+        }
 
         return SolicitudAdopcion(
-            id = doc.id,
-            petId = data["petId"]?.toString() ?: "",
-            petName = data["petName"]?.toString() ?: "",
-            applicantId = data["applicantId"]?.toString() ?: "",
-            applicantName = data["applicantName"]?.toString() ?: "",
-            applicantEmail = data["applicantEmail"]?.toString() ?: "",
-            shelterName = shelter,
-            reason = data["reason"]?.toString() ?: "",
-            hasYard = data["hasYard"] as? Boolean ?: false,
-            hasExperience = data["hasExperience"] as? Boolean ?: false,
-            termsAccepted = data["termsAccepted"] as? Boolean ?: false,
-            status = status
+            id = documento.id,
+            petId = datos["idMascota"]?.toString() ?: "",
+            petName = datos["nombreMascota"]?.toString() ?: "",
+            applicantId = datos["idSolicitante"]?.toString() ?: "",
+            applicantName = datos["nombreSolicitante"]?.toString() ?: "",
+            applicantEmail = datos["correoSolicitante"]?.toString() ?: "",
+            shelterName = datos["nombreRefugio"]?.toString() ?: "",
+            reason = datos["motivo"]?.toString() ?: "",
+            hasYard = datos["tienePatio"] as? Boolean ?: false,
+            hasExperience = datos["tieneExperiencia"] as? Boolean ?: false,
+            termsAccepted = datos["aceptaTerminos"] as? Boolean ?: false,
+            status = estado
         )
     }
 
-    private fun docToAppointment(doc: Document<Map<String, Any>>): Cita {
-        val data = doc.data
-        val statusStr = data["status"]?.toString() ?: "PROPUESTA"
-        val status = try { EstadoCita.valueOf(statusStr) } catch (_: Exception) { EstadoCita.PROPUESTA }
+    /*
+     * Traduce un documento de la tabla "citas" al modelo Cita.
+     */
+    private fun documentoACita(documento: Document<Map<String, Any>>): Cita {
+        val datos = documento.data
+        val textoEstado = datos["estado"]?.toString() ?: "PROPUESTA"
+        val estado = try {
+            EstadoCita.valueOf(textoEstado)
+        } catch (_: Exception) {
+            EstadoCita.PROPUESTA
+        }
 
         return Cita(
-            id = doc.id,
-            requestId = data["requestId"]?.toString() ?: "",
-            petName = data["petName"]?.toString() ?: "",
-            applicantName = data["applicantName"]?.toString() ?: "",
-            shelterName = data["shelterName"]?.toString() ?: "",
-            date = data["date"]?.toString() ?: "",
-            time = data["time"]?.toString() ?: "",
-            modality = data["modality"]?.toString() ?: "Presencial",
-            status = status
+            id = documento.id,
+            requestId = datos["idSolicitud"]?.toString() ?: "",
+            petName = datos["nombreMascota"]?.toString() ?: "",
+            applicantName = datos["nombreSolicitante"]?.toString() ?: "",
+            shelterName = datos["nombreRefugio"]?.toString() ?: "",
+            date = datos["fecha"]?.toString() ?: "",
+            time = datos["hora"]?.toString() ?: "",
+            modality = datos["modalidad"]?.toString() ?: "Presencial",
+            status = estado
         )
     }
 }

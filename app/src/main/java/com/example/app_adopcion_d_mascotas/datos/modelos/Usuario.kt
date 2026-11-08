@@ -2,24 +2,33 @@ package com.example.app_adopcion_d_mascotas.datos.modelos
 
 import com.example.app_adopcion_d_mascotas.datos.remoto.ClienteAppwrite
 
-// Roles de usuario (RF1)
+/*
+ * ============================================================================
+ * ARCHIVO: Usuario.kt
+ * CAPA: Datos -> Modelos (RF1 y RF2)
+ * ¿QUÉ HACE?: Representa a una persona o institución registrada en la app.
+ *             Puede tener uno de dos roles: ADOPTANTE o REFUGIO.
+ * ============================================================================
+ */
+
+// Los dos tipos de usuario permitidos en el sistema (RF1)
 enum class RolUsuario {
-    ADOPTANTE,
-    REFUGIO
+    ADOPTANTE, // Persona que busca adoptar una mascota
+    REFUGIO    // Albergue o rescatista que publica mascotas en adopción
 }
 
 typealias UserRole = RolUsuario
 
-// Modelo de datos del Usuario (RF1 y RF2)
 data class Usuario(
-    val id: String = "",
-    val name: String = "",
-    val email: String = "",
-    val role: RolUsuario = RolUsuario.ADOPTANTE,
-    val phone: String = "",
-    val bio: String = "",
-    val avatarPhotoId: String = ""
+    val id: String = "",            // Identificador único del usuario en Appwrite Auth
+    val name: String = "",          // Nombre completo o nombre del refugio
+    val email: String = "",         // Correo electrónico
+    val role: RolUsuario = RolUsuario.ADOPTANTE, // Rol asignado (ADOPTANTE o REFUGIO)
+    val phone: String = "",         // Teléfono de contacto (9 dígitos - RF2)
+    val bio: String = "",           // Biografía o dirección del refugio (RF2)
+    val avatarPhotoId: String = ""  // ID de la foto de perfil en Appwrite Storage (RF2)
 ) {
+    // Propiedades en español claro para usar en toda la aplicación
     val nombre: String get() = name
     val correo: String get() = email
     val rol: RolUsuario get() = role
@@ -27,15 +36,20 @@ data class Usuario(
     val biografia: String get() = bio
     val idFotoAvatar: String get() = avatarPhotoId
 
-    // URL del avatar (de Appwrite Storage o generado con Dicebear)
-    val avatarUrl: String
+    /*
+     * Devuelve el enlace (URL) de la foto de perfil.
+     * Si el usuario subió una foto a Appwrite, usa esa foto real.
+     * Si aún no tiene foto, genera un avatar simpático con su nombre.
+     */
+    val urlAvatar: String
         get() = if (avatarPhotoId.isNotBlank()) {
-            ClienteAppwrite.getFileViewUrl(avatarPhotoId)
+            ClienteAppwrite.obtenerUrlArchivo(avatarPhotoId)
         } else {
-            "https://api.dicebear.com/7.x/bottts/png?seed=${name.ifBlank { "User" }}"
+            val semilla = name.ifBlank { "Usuario" }.replace(" ", "")
+            "https://api.dicebear.com/7.x/bottts/png?seed=$semilla"
         }
 
-    val urlAvatar: String get() = avatarUrl
+    val avatarUrl: String get() = urlAvatar
 }
 
 typealias User = Usuario

@@ -4,8 +4,6 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -16,6 +14,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AddAPhoto
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Favorite
@@ -37,12 +36,24 @@ import coil.compose.AsyncImage
 import com.example.app_adopcion_d_mascotas.datos.modelos.Mascota
 import com.example.app_adopcion_d_mascotas.datos.modelos.Pet
 import com.example.app_adopcion_d_mascotas.datos.modelos.PetFollowUp
-import com.example.app_adopcion_d_mascotas.datos.modelos.SeguimientoMascota
+import com.example.app_adopcion_d_mascotas.datos.modelos.RolUsuario
 import com.example.app_adopcion_d_mascotas.datos.modelos.User
 import com.example.app_adopcion_d_mascotas.datos.modelos.Usuario
+import com.example.app_adopcion_d_mascotas.ui.componentes.RecortadorImagenDialogo
 import com.example.app_adopcion_d_mascotas.ui.modelovista.FollowUpViewModel
 import com.example.app_adopcion_d_mascotas.ui.modelovista.ModeloSeguimiento
 
+/*
+ * ============================================================================
+ * PANTALLA DE SEGUIMIENTO POST-ADOPCIÓN (RF11)
+ * ============================================================================
+ * ¿Qué hace esta pantalla?
+ * 1. Consulta todos los reportes de la tabla `seguimientos` en Appwrite Cloud.
+ * 2. Permite al adoptante registrar reportes de salud, adaptación al hogar y
+ *    subir hasta 3 fotos recortadas profesionalmente a `fotos_mascotas`.
+ * 3. Permite al Refugio marcar cada reporte como "REVISADO" en la nube.
+ * ============================================================================
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PantallaSeguimiento(
@@ -65,13 +76,14 @@ fun FollowUpScreen(
     followUpViewModel: ModeloSeguimiento = viewModel(),
     onBackClick: () -> Unit
 ) {
-    val contexto = LocalContext.current
     val estadoSnackbar = remember { SnackbarHostState() }
 
+    // Paso 1: Cargar historial de seguimientos de la mascota desde Appwrite Cloud
     LaunchedEffect(pet) {
         pet?.let { followUpViewModel.cargarSeguimientos(it.id) }
     }
 
+    // Paso 2: Mostrar notificaciones de éxito o error
     LaunchedEffect(followUpViewModel.mensajeEstado) {
         followUpViewModel.mensajeEstado?.let { mensaje ->
             estadoSnackbar.showSnackbar(mensaje)
@@ -88,7 +100,11 @@ fun FollowUpScreen(
                 title = {
                     Column {
                         Text("Seguimiento Post-Adopción (RF11)", fontWeight = FontWeight.Bold, fontSize = 17.sp)
-                        Text(text = "Mascota: ${pet?.name ?: ""}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            text = "Mascota: ${pet?.nombre ?: ""}",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 },
                 navigationIcon = {
@@ -125,49 +141,55 @@ fun FollowUpScreen(
                     .widthIn(max = 760.dp)
                     .fillMaxWidth()
             ) {
-            if (followUpViewModel.estaCargando) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-            } else if (followUpViewModel.listaSeguimientos.isEmpty()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Description,
-                        contentDescription = null,
-                        modifier = Modifier.size(64.dp),
-                        tint = MaterialTheme.colorScheme.outline
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "Aún no hay reportes de seguimiento",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 17.sp
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Sé el primero en registrar cómo se encuentra ${pet.name} en su nuevo hogar.",
-                        fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    items(followUpViewModel.listaSeguimientos) { reporte ->
-                        TarjetaReporteSeguimiento(followUp = reporte)
+                if (followUpViewModel.estaCargando) {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                } else if (followUpViewModel.listaSeguimientos.isEmpty()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Description,
+                            contentDescription = null,
+                            modifier = Modifier.size(64.dp),
+                            tint = MaterialTheme.colorScheme.outline
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Aún no hay reportes de seguimiento",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 17.sp
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Sé el primero en registrar cómo se encuentra ${pet.nombre} en su nuevo hogar.",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        items(followUpViewModel.listaSeguimientos) { reporte ->
+                            TarjetaReporteSeguimiento(
+                                followUp = reporte,
+                                esRefugio = currentUser?.rol == RolUsuario.REFUGIO,
+                                alMarcarRevisado = {
+                                    followUpViewModel.marcarReporteComoRevisado(reporte.id, pet.id)
+                                }
+                            )
+                        }
                     }
                 }
             }
         }
     }
-}
 
     if (mostrarDialogoCrear && pet != null && currentUser != null) {
         DialogoCrearSeguimiento(
@@ -183,7 +205,11 @@ fun FollowUpScreen(
 }
 
 @Composable
-fun TarjetaReporteSeguimiento(followUp: PetFollowUp) {
+fun TarjetaReporteSeguimiento(
+    followUp: PetFollowUp,
+    esRefugio: Boolean = false,
+    alMarcarRevisado: () -> Unit = {}
+) {
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -214,25 +240,26 @@ fun TarjetaReporteSeguimiento(followUp: PetFollowUp) {
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
                         Text(
-                            text = "Reporte de ${followUp.applicantName.ifBlank { "Adoptante" }}",
+                            text = "Reporte de ${followUp.nombreSolicitante.ifBlank { "Adoptante" }}",
                             fontWeight = FontWeight.Bold,
                             fontSize = 15.sp
                         )
                         Text(
-                            text = "Fecha: ${followUp.date}",
+                            text = "Fecha: ${followUp.fecha}",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
 
+                val esRevisado = followUp.estado == "REVISADO"
                 Surface(
                     shape = RoundedCornerShape(6.dp),
-                    color = Color(0xFFE8F5E9)
+                    color = if (esRevisado) Color(0xFFE3F2FD) else Color(0xFFE8F5E9)
                 ) {
                     Text(
-                        text = followUp.status,
-                        color = Color(0xFF2E7D32),
+                        text = if (esRevisado) "✓ REVISADO POR REFUGIO" else followUp.estado,
+                        color = if (esRevisado) Color(0xFF1565C0) else Color(0xFF2E7D32),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
@@ -242,8 +269,8 @@ fun TarjetaReporteSeguimiento(followUp: PetFollowUp) {
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Fotos del reporte
-            val fotos = followUp.getAllPhotoUrls()
+            // Fotos del reporte desde Appwrite Storage
+            val fotos = followUp.obtenerUrlsFotos()
             if (fotos.isNotEmpty()) {
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -264,7 +291,7 @@ fun TarjetaReporteSeguimiento(followUp: PetFollowUp) {
             }
 
             // Notas de Salud
-            if (followUp.healthNotes.isNotBlank()) {
+            if (followUp.notasSalud.isNotBlank()) {
                 Row(verticalAlignment = Alignment.Top) {
                     Icon(
                         imageVector = Icons.Default.HealthAndSafety,
@@ -275,14 +302,14 @@ fun TarjetaReporteSeguimiento(followUp: PetFollowUp) {
                     Spacer(modifier = Modifier.width(6.dp))
                     Column {
                         Text(text = "Salud y Bienestar:", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        Text(text = followUp.healthNotes, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
+                        Text(text = followUp.notasSalud, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
             // Notas de Adaptación
-            if (followUp.adaptationNotes.isNotBlank()) {
+            if (followUp.notasAdaptacion.isNotBlank()) {
                 Row(verticalAlignment = Alignment.Top) {
                     Icon(
                         imageVector = Icons.Default.Home,
@@ -293,8 +320,21 @@ fun TarjetaReporteSeguimiento(followUp: PetFollowUp) {
                     Spacer(modifier = Modifier.width(6.dp))
                     Column {
                         Text(text = "Adaptación al Hogar:", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        Text(text = followUp.adaptationNotes, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
+                        Text(text = followUp.notasAdaptacion, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
                     }
+                }
+            }
+
+            // Si el usuario es Refugio y aún no está revisado, mostrar botón de revisión
+            if (esRefugio && followUp.estado != "REVISADO") {
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = alMarcarRevisado,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(imageVector = Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Marcar Reporte como Revisado")
                 }
             }
         }
@@ -313,10 +353,30 @@ fun DialogoCrearSeguimiento(
     var notasSalud by remember { mutableStateOf("") }
     var notasAdaptacion by remember { mutableStateOf("") }
 
-    val lanzadorSelectorFotos = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 3)
-    ) { uris ->
-        followUpViewModel.seleccionarFotos(uris)
+    // Estado para recortar la foto seleccionada antes de adjuntarla al reporte
+    var uriParaRecortar by remember { mutableStateOf<Uri?>(null) }
+
+    val lanzadorSelectorFoto = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            uriParaRecortar = uri
+        }
+    }
+
+    // Mostrar diálogo recortador cuando el usuario elige una foto
+    uriParaRecortar?.let { uriOriginal ->
+        RecortadorImagenDialogo(
+            uriImagenOriginal = uriOriginal,
+            titulo = "Ajustar Foto de Seguimiento",
+            alConfirmarRecorte = { uriRecortada ->
+                followUpViewModel.agregarFotoAjustada(uriRecortada)
+                uriParaRecortar = null
+            },
+            alCancelar = {
+                uriParaRecortar = null
+            }
+        )
     }
 
     AlertDialog(
@@ -331,30 +391,31 @@ fun DialogoCrearSeguimiento(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "Reporta cómo se encuentra ${pet.name} en su nuevo hogar y sube hasta 3 fotos de evidencia.",
+                    text = "Reporta cómo se encuentra ${pet.nombre} en su nuevo hogar y sube hasta 3 fotos de evidencia.",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                // Botón selector de fotos
+                // Botón selector de fotos con ajuste interactivo
                 OutlinedButton(
                     onClick = {
-                        lanzadorSelectorFotos.launch(
+                        lanzadorSelectorFoto.launch(
                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                         )
                     },
+                    enabled = followUpViewModel.fotosSeleccionadas.size < 3,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(imageVector = Icons.Default.AddAPhoto, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Adjuntar fotos del hogar (${followUpViewModel.fotosSeleccionadas.size}/3)")
+                    Text("Añadir y Ajustar Foto (${followUpViewModel.fotosSeleccionadas.size}/3)")
                 }
 
-                // Miniatura de fotos seleccionadas
+                // Miniaturas de fotos seleccionadas
                 if (followUpViewModel.fotosSeleccionadas.isNotEmpty()) {
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(followUpViewModel.fotosSeleccionadas.size) { indice ->
-                            Box(modifier = Modifier.size(60.dp)) {
+                            Box(modifier = Modifier.size(64.dp)) {
                                 AsyncImage(
                                     model = followUpViewModel.fotosSeleccionadas[indice],
                                     contentDescription = null,
@@ -379,7 +440,7 @@ fun DialogoCrearSeguimiento(
                 OutlinedTextField(
                     value = notasSalud,
                     onValueChange = { notasSalud = it },
-                    label = { Text("Estado de salud, peso y vacunas") },
+                    label = { Text("Estado de salud, peso y vacunas *") },
                     maxLines = 3,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -387,7 +448,7 @@ fun DialogoCrearSeguimiento(
                 OutlinedTextField(
                     value = notasAdaptacion,
                     onValueChange = { notasAdaptacion = it },
-                    label = { Text("Comportamiento y adaptación al hogar") },
+                    label = { Text("Comportamiento y adaptación al hogar *") },
                     maxLines = 3,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -396,13 +457,13 @@ fun DialogoCrearSeguimiento(
         confirmButton = {
             Button(
                 onClick = {
-                    followUpViewModel.submitReport(
-                        context = contexto,
-                        pet = pet,
-                        currentUser = currentUser,
-                        healthNotes = notasSalud,
-                        adaptationNotes = notasAdaptacion,
-                        onSuccess = onSubmitted
+                    followUpViewModel.enviarReporte(
+                        contexto = contexto,
+                        mascota = pet,
+                        usuarioActual = currentUser,
+                        notasSalud = notasSalud,
+                        notasAdaptacion = notasAdaptacion,
+                        alTenerExito = onSubmitted
                     )
                 },
                 enabled = !followUpViewModel.estaEnviando

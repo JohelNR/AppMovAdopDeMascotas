@@ -1,22 +1,14 @@
 package com.example.app_adopcion_d_mascotas.navegacion
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
-import androidx.compose.material3.Button
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.example.app_adopcion_d_mascotas.datos.modelos.User
 import com.example.app_adopcion_d_mascotas.datos.modelos.Usuario
+import com.example.app_adopcion_d_mascotas.datos.repositorios.RepositorioAutenticacionAppwrite
 import com.example.app_adopcion_d_mascotas.datos.repositorios.RepositorioMascotasAppwrite
 import com.example.app_adopcion_d_mascotas.ui.componentes.FondoApp
 import com.example.app_adopcion_d_mascotas.ui.modelovista.ModeloCatalogo
@@ -33,26 +25,47 @@ import com.example.app_adopcion_d_mascotas.ui.pantallas.solicitudes.PantallaForm
 import com.example.app_adopcion_d_mascotas.ui.pantallas.solicitudes.PantallaSolicitudes
 import kotlinx.coroutines.launch
 
+/*
+ * ============================================================================
+ * ARCHIVO: NavegacionApp.kt
+ * CAPA: Navegación Central (Jetpack Navigation Compose)
+ * ¿QUÉ HACE?: Conecta las 10 pantallas de la aplicación como un mapa de rutas.
+ *             Si el usuario ya tenía su sesión iniciada en Appwrite Cloud,
+ *             lo lleva automáticamente al Catálogo al abrir la app.
+ * ============================================================================
+ */
 @Composable
 fun NavegacionApp() {
-    // 1. El controlador de navegación oficial de Google Compose
+    // Paso 1: Crear el controlador de navegación y el alcance para tareas en la nube
     val controladorNavegacion = rememberNavController()
     val alcanceCorrutina = rememberCoroutineScope()
 
-    // 2. ViewModels compartidos para todo el ciclo de vida de la aplicación
+    // Paso 2: Crear los ModeloVista compartidos entre pantallas
     val modeloCatalogo: ModeloCatalogo = viewModel()
     val modeloSolicitudes: ModeloSolicitudes = viewModel()
 
-    // 3. Estado en memoria del usuario actualmente conectado
+    // Paso 3: Guardar en estado reactivo quién es el usuario conectado actualmente
     var usuarioActual by remember { mutableStateOf<Usuario?>(null) }
 
-    // 4. El NavHost envuelto en FondoApp para el fondo con huellitas en toda la app
+    // Paso 4: Al abrir la aplicación, verificar si ya hay sesión activa en Appwrite Cloud
+    LaunchedEffect(Unit) {
+        val sesionActiva = RepositorioAutenticacionAppwrite.obtenerUsuarioActual()
+        if (sesionActiva != null) {
+            usuarioActual = sesionActiva
+            modeloCatalogo.cargarMascotas()
+            controladorNavegacion.navigate(Ruta.Catalogo.ruta) {
+                popUpTo(Ruta.InicioSesion.ruta) { inclusive = true }
+            }
+        }
+    }
+
+    // Paso 5: Envolver todas las pantallas en nuestro fondo cálido con huellitas
     FondoApp {
         NavHost(
             navController = controladorNavegacion,
             startDestination = Ruta.InicioSesion.ruta
         ) {
-            // RUTA 1: Login y Registro (RF1)
+            // RUTA 1: Inicio de Sesión y Registro con Roles (RF1)
             composable(Ruta.InicioSesion.ruta) {
                 PantallaInicioSesion(
                     alIniciarSesion = { usuarioConectado ->
@@ -65,7 +78,7 @@ fun NavegacionApp() {
                 )
             }
 
-            // RUTA 2: Catálogo de Mascotas con Filtros y Búsqueda (RF4, RF5, RF6)
+            // RUTA 2: Catálogo de Mascotas con Búsqueda y Filtros Combinados (RF4 y RF5)
             composable(Ruta.Catalogo.ruta) {
                 PantallaCatalogo(
                     usuarioActual = usuarioActual,
@@ -86,22 +99,23 @@ fun NavegacionApp() {
                         controladorNavegacion.navigate(Ruta.Perfil.ruta)
                     },
                     alCerrarSesion = {
-                        usuarioActual = null
-                        controladorNavegacion.navigate(Ruta.InicioSesion.ruta) {
-                            popUpTo(0) { inclusive = true }
+                        alcanceCorrutina.launch {
+                            RepositorioAutenticacionAppwrite.cerrarSesion()
+                            usuarioActual = null
+                            controladorNavegacion.navigate(Ruta.InicioSesion.ruta) {
+                                popUpTo(0) { inclusive = true }
+                            }
                         }
                     }
                 )
             }
 
-            // RUTA 3: Detalle de Mascota con fotos, mapa, chat y seguimiento (RF4, RF7)
+            // RUTA 3: Detalle de Mascota con Carrusel, Mapa Interactivo, Chat y Gestión (RF6 y RF7)
             composable(
                 route = Ruta.Detalle.ruta,
-                arguments = listOf(
-                    navArgument("petId") { type = NavType.StringType }
-                )
-            ) { backStackEntry ->
-                val idMascota = backStackEntry.arguments?.getString("petId") ?: ""
+                arguments = listOf(navArgument("petId") { type = NavType.StringType })
+            ) { entrada ->
+                val idMascota = entrada.arguments?.getString("petId") ?: ""
                 val mascota = modeloCatalogo.todasLasMascotas.find { it.id == idMascota }
 
                 PantallaDetalleMascota(
@@ -113,16 +127,22 @@ fun NavegacionApp() {
                     },
                     alEliminar = { id ->
                         alcanceCorrutina.launch {
-                            RepositorioMascotasAppwrite.deletePet(id)
+                            RepositorioMascotasAppwrite.eliminarMascota(id)
                             modeloCatalogo.cargarMascotas()
                             controladorNavegacion.popBackStack()
                         }
                     },
                     alMarcarAdoptada = { id ->
                         alcanceCorrutina.launch {
-                            RepositorioMascotasAppwrite.markAsAdopted(id)
+                            RepositorioMascotasAppwrite.marcarComoAdoptada(id)
                             modeloCatalogo.cargarMascotas()
                             controladorNavegacion.popBackStack()
+                        }
+                    },
+                    alCambiarEstado = { id, nuevoEstado ->
+                        alcanceCorrutina.launch {
+                            RepositorioMascotasAppwrite.cambiarEstadoMascota(id, nuevoEstado)
+                            modeloCatalogo.cargarMascotas()
                         }
                     },
                     alAdoptar = { id ->
@@ -133,7 +153,7 @@ fun NavegacionApp() {
                             Ruta.Chat.crearRuta(
                                 idChat = idChat,
                                 nombreMascota = nombreMascota,
-                                nombreDestinatario = mascota?.shelterName ?: "Refugio"
+                                nombreDestinatario = mascota?.nombreRefugio ?: "Refugio"
                             )
                         )
                     },
@@ -141,15 +161,15 @@ fun NavegacionApp() {
                         controladorNavegacion.navigate(
                             Ruta.Seguimiento.crearRuta(
                                 idMascota = id,
-                                nombreMascota = mascota?.name ?: "",
-                                nombreRefugio = mascota?.shelterName ?: "Refugio"
+                                nombreMascota = mascota?.nombre ?: "",
+                                nombreRefugio = mascota?.nombreRefugio ?: "Refugio"
                             )
                         )
                     }
                 )
             }
 
-            // RUTA 4: Crear o Editar Mascota con subida real de fotos (RF3)
+            // RUTA 4: Publicar o Editar Mascota con Recorte de Foto y Mapa GPS (RF3, RF6 y RF7)
             composable(
                 route = Ruta.Publicar.ruta,
                 arguments = listOf(
@@ -159,9 +179,11 @@ fun NavegacionApp() {
                         defaultValue = null
                     }
                 )
-            ) { backStackEntry ->
-                val idMascota = backStackEntry.arguments?.getString("petId")
-                val mascotaExistente = idMascota?.let { id -> modeloCatalogo.todasLasMascotas.find { it.id == id } }
+            ) { entrada ->
+                val idMascota = entrada.arguments?.getString("petId")
+                val mascotaExistente = idMascota?.let { id ->
+                    modeloCatalogo.todasLasMascotas.find { it.id == id }
+                }
 
                 PantallaCrearEditarMascota(
                     mascotaExistente = mascotaExistente,
@@ -174,14 +196,12 @@ fun NavegacionApp() {
                 )
             }
 
-            // RUTA 5: Formulario de Postulación de Adopción (RF8)
+            // RUTA 5: Formulario de Solicitud de Adopción (RF8)
             composable(
                 route = Ruta.FormularioAdopcion.ruta,
-                arguments = listOf(
-                    navArgument("petId") { type = NavType.StringType }
-                )
-            ) { backStackEntry ->
-                val idMascota = backStackEntry.arguments?.getString("petId") ?: ""
+                arguments = listOf(navArgument("petId") { type = NavType.StringType })
+            ) { entrada ->
+                val idMascota = entrada.arguments?.getString("petId") ?: ""
                 val mascota = modeloCatalogo.todasLasMascotas.find { it.id == idMascota }
 
                 PantallaFormularioAdopcion(
@@ -196,7 +216,7 @@ fun NavegacionApp() {
                 )
             }
 
-            // RUTA 6: Panel de Solicitudes (RF9, RF10)
+            // RUTA 6: Panel de Solicitudes con Aprobación en Cascada y Botón de Chat (RF9, RF10, RF13)
             composable(Ruta.Solicitudes.ruta) {
                 PantallaSolicitudes(
                     usuarioActual = usuarioActual,
@@ -205,11 +225,20 @@ fun NavegacionApp() {
                     alVolver = { controladorNavegacion.popBackStack() },
                     alIrACitas = {
                         controladorNavegacion.navigate(Ruta.Citas.ruta)
+                    },
+                    alAbrirChat = { idChat, nombreMascota, nombreDestinatario ->
+                        controladorNavegacion.navigate(
+                            Ruta.Chat.crearRuta(
+                                idChat = idChat,
+                                nombreMascota = nombreMascota,
+                                nombreDestinatario = nombreDestinatario
+                            )
+                        )
                     }
                 )
             }
 
-            // RUTA 7: Coordinación de Citas y Entrevistas (RF20)
+            // RUTA 7: Agenda de Citas y Entrevistas (RF20)
             composable(Ruta.Citas.ruta) {
                 PantallaCitas(
                     usuarioActual = usuarioActual,
@@ -218,7 +247,7 @@ fun NavegacionApp() {
                 )
             }
 
-            // RUTA 8: Perfil de Usuario con foto de avatar y gestión (RF2)
+            // RUTA 8: Perfil de Usuario con Recorte de Avatar y Selector de Tema (RF2 y RF16)
             composable(Ruta.Perfil.ruta) {
                 PantallaPerfil(
                     usuarioActual = usuarioActual,
@@ -227,9 +256,12 @@ fun NavegacionApp() {
                     },
                     alVolver = { controladorNavegacion.popBackStack() },
                     alCerrarSesion = {
-                        usuarioActual = null
-                        controladorNavegacion.navigate(Ruta.InicioSesion.ruta) {
-                            popUpTo(0) { inclusive = true }
+                        alcanceCorrutina.launch {
+                            RepositorioAutenticacionAppwrite.cerrarSesion()
+                            usuarioActual = null
+                            controladorNavegacion.navigate(Ruta.InicioSesion.ruta) {
+                                popUpTo(0) { inclusive = true }
+                            }
                         }
                     },
                     alHacerClicMascota = { idMascota ->
@@ -246,7 +278,7 @@ fun NavegacionApp() {
                 )
             }
 
-            // RUTA 9: Chat en Tiempo Real Adoptante - Refugio (RF13)
+            // RUTA 9: Chat en Tiempo Real Adoptante - Refugio (RF13 y RF14)
             composable(
                 route = Ruta.Chat.ruta,
                 arguments = listOf(
@@ -260,10 +292,10 @@ fun NavegacionApp() {
                         defaultValue = "Refugio"
                     }
                 )
-            ) { backStackEntry ->
-                val idChat = backStackEntry.arguments?.getString("chatId") ?: ""
-                val nombreMascota = backStackEntry.arguments?.getString("petName") ?: ""
-                val nombreDestinatario = backStackEntry.arguments?.getString("receiverName") ?: "Refugio"
+            ) { entrada ->
+                val idChat = entrada.arguments?.getString("chatId") ?: ""
+                val nombreMascota = entrada.arguments?.getString("petName") ?: ""
+                val nombreDestinatario = entrada.arguments?.getString("receiverName") ?: "Refugio"
 
                 PantallaChat(
                     idChat = idChat,
@@ -273,7 +305,7 @@ fun NavegacionApp() {
                 )
             }
 
-            // RUTA 10: Formulario y Seguimiento Post-Adopción (RF11)
+            // RUTA 10: Seguimiento Post-Adopción con Fotos en la Nube (RF11)
             composable(
                 route = Ruta.Seguimiento.ruta,
                 arguments = listOf(
@@ -287,8 +319,8 @@ fun NavegacionApp() {
                         defaultValue = "Refugio"
                     }
                 )
-            ) { backStackEntry ->
-                val idMascota = backStackEntry.arguments?.getString("petId") ?: ""
+            ) { entrada ->
+                val idMascota = entrada.arguments?.getString("petId") ?: ""
                 val mascota = modeloCatalogo.todasLasMascotas.find { it.id == idMascota }
 
                 PantallaSeguimiento(

@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Pets
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,13 +25,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.app_adopcion_d_mascotas.datos.modelos.RolUsuario
-import com.example.app_adopcion_d_mascotas.datos.modelos.User
-import com.example.app_adopcion_d_mascotas.datos.modelos.UserRole
 import com.example.app_adopcion_d_mascotas.datos.modelos.Usuario
+import com.example.app_adopcion_d_mascotas.ui.componentes.EstadoVacio
 import com.example.app_adopcion_d_mascotas.ui.componentes.TarjetaMascota
-import com.example.app_adopcion_d_mascotas.ui.modelovista.FeedViewModel
 import com.example.app_adopcion_d_mascotas.ui.modelovista.ModeloCatalogo
 
+/*
+ * ============================================================================
+ * ARCHIVO: PantallaCatalogo.kt
+ * CAPA: UI -> Pantallas -> Catálogo (RF4 y RF5)
+ * ¿QUÉ HACE?: Muestra todas las mascotas disponibles desde Appwrite Cloud.
+ *             Permite buscar por texto y filtrar combinando Especie (Perro,
+ *             Gato, Otro), Tamaño (Pequeño, Mediano, Grande), Sexo (Macho,
+ *             Hembra) y Casos Urgentes.
+ * ============================================================================
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PantallaCatalogo(
@@ -63,15 +72,22 @@ fun PantallaCatalogo(
                             )
                         }
                         Text(
-                            text = if (usuarioActual?.role == RolUsuario.REFUGIO) "Modo Refugio: ${usuarioActual.name}" else "Bienvenido, ${usuarioActual?.name ?: "Adoptante"}",
+                            text = if (usuarioActual?.rol == RolUsuario.REFUGIO)
+                                "🏠 Refugio: ${usuarioActual.nombre}"
+                            else
+                                "🐾 Adoptante: ${usuarioActual?.nombre ?: "Bienvenido"}",
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 },
                 actions = {
+                    // Botón para recargar datos desde Appwrite Cloud en cualquier momento
+                    IconButton(onClick = { modeloCatalogo.cargarMascotas() }) {
+                        Icon(imageVector = Icons.Default.Refresh, contentDescription = "Actualizar catálogo")
+                    }
                     IconButton(onClick = alVerPerfil) {
-                        Icon(imageVector = Icons.Default.AccountCircle, contentDescription = "Perfil")
+                        Icon(imageVector = Icons.Default.AccountCircle, contentDescription = "Mi Perfil")
                     }
                     IconButton(onClick = alVerCitas) {
                         Icon(imageVector = Icons.Default.CalendarMonth, contentDescription = "Citas")
@@ -86,13 +102,15 @@ fun PantallaCatalogo(
             )
         },
         floatingActionButton = {
-            if (usuarioActual?.role == RolUsuario.REFUGIO) {
-                FloatingActionButton(
+            // RF3: Solo los usuarios con rol REFUGIO ven el botón para publicar nuevas mascotas
+            if (usuarioActual?.rol == RolUsuario.REFUGIO) {
+                ExtendedFloatingActionButton(
                     onClick = alPublicarMascota,
-                    containerColor = MaterialTheme.colorScheme.primary
-                ) {
-                    Icon(imageVector = Icons.Default.Add, contentDescription = "Publicar Mascota")
-                }
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    icon = { Icon(imageVector = Icons.Default.Add, contentDescription = null) },
+                    text = { Text("Publicar Mascota", fontWeight = FontWeight.Bold) }
+                )
             }
         }
     ) { paddingValues ->
@@ -108,183 +126,172 @@ fun PantallaCatalogo(
                     .widthIn(max = 840.dp)
                     .fillMaxWidth()
             ) {
-            // RF6: Barra de Búsqueda por texto (Nombre, Raza o Refugio)
-            OutlinedTextField(
-                value = modeloCatalogo.textoBusqueda,
-                onValueChange = { modeloCatalogo.textoBusqueda = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                placeholder = { Text("Buscar por nombre, raza o refugio...") },
-                leadingIcon = {
-                    Icon(imageVector = Icons.Default.Search, contentDescription = "Buscar")
-                },
-                trailingIcon = {
-                    if (modeloCatalogo.textoBusqueda.isNotEmpty()) {
-                        IconButton(onClick = { modeloCatalogo.textoBusqueda = "" }) {
-                            Icon(imageVector = Icons.Default.Clear, contentDescription = "Limpiar")
+                // Paso 1: Barra de búsqueda por nombre, raza, refugio o ciudad (RF5)
+                OutlinedTextField(
+                    value = modeloCatalogo.textoBusqueda,
+                    onValueChange = { modeloCatalogo.textoBusqueda = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    placeholder = { Text("Buscar por nombre, raza, refugio o ciudad...") },
+                    leadingIcon = {
+                        Icon(imageVector = Icons.Default.Search, contentDescription = "Buscar")
+                    },
+                    trailingIcon = {
+                        if (modeloCatalogo.textoBusqueda.isNotEmpty()) {
+                            IconButton(onClick = { modeloCatalogo.textoBusqueda = "" }) {
+                                Icon(imageVector = Icons.Default.Clear, contentDescription = "Limpiar")
+                            }
                         }
-                    }
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(14.dp)
-            )
-
-            // RF6: Filtros Rápidos Combinables
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                // Filtro 1: Especie (Perro / Gato / Todos)
-                Row(
-                    modifier = Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    listOf("Todos", "Perro", "Gato").forEach { item ->
-                        FilterChip(
-                            selected = modeloCatalogo.especieSeleccionada == item,
-                            onClick = { modeloCatalogo.especieSeleccionada = item },
-                            label = { Text(if (item == "Todos") "🐾 Todas" else item) }
-                        )
-                    }
-                }
-
-                // Filtro 2: Tamaño y Sexo combinados
-                Row(
-                    modifier = Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    listOf("Todos", "Pequeño", "Mediano", "Grande").forEach { size ->
-                        FilterChip(
-                            selected = modeloCatalogo.tamanoSeleccionado == size,
-                            onClick = { modeloCatalogo.tamanoSeleccionado = size },
-                            label = { Text(if (size == "Todos") "📏 Cualquier tamaño" else size) }
-                        )
-                    }
-
-                    listOf("Macho", "Hembra").forEach { gender ->
-                        FilterChip(
-                            selected = modeloCatalogo.sexoSeleccionado == gender,
-                            onClick = {
-                                modeloCatalogo.sexoSeleccionado = if (modeloCatalogo.sexoSeleccionado == gender) "Todos" else gender
-                            },
-                            label = { Text(gender) }
-                        )
-                    }
-                }
-            }
-
-            // RF6: Contador coherente de resultados
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "${modeloCatalogo.cantidadResultados} mascotas disponibles",
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = FontWeight.Medium
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp)
                 )
 
-                if (modeloCatalogo.textoBusqueda.isNotEmpty() ||
-                    modeloCatalogo.especieSeleccionada != "Todos" ||
-                    modeloCatalogo.tamanoSeleccionado != "Todos" ||
-                    modeloCatalogo.sexoSeleccionado != "Todos") {
-                    TextButton(
-                        onClick = { modeloCatalogo.limpiarFiltros() },
-                        contentPadding = PaddingValues(0.dp)
-                    ) {
-                        Text("Limpiar filtros", fontSize = 12.sp)
-                    }
-                }
-            }
-
-            // Lista reactiva de mascotas
-            if (modeloCatalogo.estaCargando) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
-            } else if (modeloCatalogo.mascotasFiltradas.isEmpty()) {
-                Box(
+                // Paso 2: Chips de filtros combinables (RF5: Especie, Urgencia, Tamaño y Sexo)
+                Column(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(32.dp),
-                    contentAlignment = Alignment.Center
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = null,
-                            modifier = Modifier.size(56.dp),
-                            tint = MaterialTheme.colorScheme.outline
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = "No se encontraron mascotas con esos filtros",
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.outline
+                    // Fila 1: Especie (Todas, Perro, Gato, Otro) + Chip de Solo Urgentes
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf("Todos", "Perro", "Gato", "Otro").forEach { especie ->
+                            FilterChip(
+                                selected = modeloCatalogo.especieSeleccionada == especie,
+                                onClick = { modeloCatalogo.especieSeleccionada = especie },
+                                label = { Text(if (especie == "Todos") "🐾 Todas las especies" else especie) }
+                            )
+                        }
+                        FilterChip(
+                            selected = modeloCatalogo.soloUrgentes,
+                            onClick = { modeloCatalogo.soloUrgentes = !modeloCatalogo.soloUrgentes },
+                            label = { Text("🚨 Solo Urgentes") }
                         )
                     }
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    // RF5: Sección destacada de Mascotas Urgentes
-                    if (modeloCatalogo.mascotasUrgentes.isNotEmpty() && modeloCatalogo.textoBusqueda.isEmpty()) {
-                        item {
-                            Text(
-                                text = "🚨 Casos Urgentes",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.error
+
+                    // Fila 2: Tamaño (Pequeño, Mediano, Grande) y Sexo (Macho, Hembra)
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf("Todos", "Pequeño", "Mediano", "Grande").forEach { tamano ->
+                            FilterChip(
+                                selected = modeloCatalogo.tamanoSeleccionado == tamano,
+                                onClick = { modeloCatalogo.tamanoSeleccionado = tamano },
+                                label = { Text(if (tamano == "Todos") "📏 Cualquier tamaño" else tamano) }
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            LazyRow(
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                items(modeloCatalogo.mascotasUrgentes) { mascotaUrgente ->
-                                    TarjetaMascota(
-                                        mascota = mascotaUrgente,
-                                        alHacerClic = { alHacerClicMascota(mascotaUrgente.id) },
-                                        modifier = Modifier.width(280.dp)
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = "🐾 Todas las Mascotas",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold
+                        }
+
+                        listOf("Macho", "Hembra").forEach { sexo ->
+                            FilterChip(
+                                selected = modeloCatalogo.sexoSeleccionado == sexo,
+                                onClick = {
+                                    modeloCatalogo.sexoSeleccionado =
+                                        if (modeloCatalogo.sexoSeleccionado == sexo) "Todos" else sexo
+                                },
+                                label = { Text(sexo) }
                             )
                         }
                     }
+                }
 
-                    // Lista general de mascotas filtradas
-                    items(modeloCatalogo.mascotasFiltradas, key = { it.id }) { mascota ->
-                        TarjetaMascota(
-                            mascota = mascota,
-                            alHacerClic = { alHacerClicMascota(mascota.id) }
-                        )
+                // Paso 3: Contador de resultados encontrados y botón para limpiar filtros
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "${modeloCatalogo.cantidadResultados} mascotas disponibles en la nube",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Medium
+                    )
+
+                    if (modeloCatalogo.textoBusqueda.isNotEmpty() ||
+                        modeloCatalogo.especieSeleccionada != "Todos" ||
+                        modeloCatalogo.tamanoSeleccionado != "Todos" ||
+                        modeloCatalogo.sexoSeleccionado != "Todos" ||
+                        modeloCatalogo.soloUrgentes
+                    ) {
+                        TextButton(
+                            onClick = { modeloCatalogo.limpiarFiltros() },
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Text("Limpiar filtros", fontSize = 12.sp)
+                        }
+                    }
+                }
+
+                // Paso 4: Mostrar listado de mascotas o estado vacío
+                if (modeloCatalogo.estaCargando) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                } else if (modeloCatalogo.mascotasFiltradas.isEmpty()) {
+                    EstadoVacio(
+                        icono = Icons.Default.Search,
+                        titulo = "No se encontraron mascotas con esos filtros",
+                        descripcion = "Prueba cambiando la especie, el tamaño o limpiando la búsqueda."
+                    )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        // Carrusel horizontal de casos urgentes cuando no hay búsqueda de texto activa
+                        if (modeloCatalogo.mascotasUrgentes.isNotEmpty() &&
+                            modeloCatalogo.textoBusqueda.isEmpty() &&
+                            !modeloCatalogo.soloUrgentes
+                        ) {
+                            item {
+                                Text(
+                                    text = "🚨 Casos de Adopción Urgente",
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    items(modeloCatalogo.mascotasUrgentes, key = { "urg_${it.id}" }) { mascotaUrgente ->
+                                        TarjetaMascota(
+                                            mascota = mascotaUrgente,
+                                            alHacerClic = { alHacerClicMascota(mascotaUrgente.id) },
+                                            modifier = Modifier.width(280.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = "🐾 Catálogo Completo",
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        // Lista principal de tarjetas de mascotas
+                        items(modeloCatalogo.mascotasFiltradas, key = { it.id }) { mascota ->
+                            TarjetaMascota(
+                                mascota = mascota,
+                                alHacerClic = { alHacerClicMascota(mascota.id) }
+                            )
+                        }
                     }
                 }
             }
         }
     }
 }
-}
 
-// Wrapper para compatibilidad
 @Composable
 fun FeedScreen(
     currentUser: Usuario?,

@@ -1,6 +1,5 @@
 package com.example.app_adopcion_d_mascotas.datos.repositorios
 
-import com.example.app_adopcion_d_mascotas.datos.modelos.ChatMessage
 import com.example.app_adopcion_d_mascotas.datos.modelos.MensajeChat
 import com.example.app_adopcion_d_mascotas.datos.remoto.ClienteAppwrite
 import io.appwrite.ID
@@ -9,149 +8,132 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
-// RF13: Repositorio para Chat en Tiempo Real entre Adoptante y Refugio
+/*
+ * ============================================================================
+ * ARCHIVO: RepositorioChatAppwrite.kt
+ * CAPA: Datos -> Repositorios (RF13 y RF14)
+ * ¿QUÉ HACE?: Envía, descarga y escucha mensajes en tiempo real desde la
+ *             tabla "mensajes" de Appwrite Cloud (100% real entre dos
+ *             celulares distintos, sin bots simulados ni listas en RAM).
+ *             Columnas en español: idChat, nombreMascota, idEmisor,
+ *             nombreEmisor, idReceptor, texto, fechaHora, leido.
+ * ============================================================================
+ */
 object RepositorioChatAppwrite {
 
-    // Caché en memoria para garantizar que el chat funcione en tiempo real sin latencia
-    private val localMessages = mutableListOf<MensajeChat>()
-
-    // RF13: Enviar mensaje
-    suspend fun sendMessage(message: MensajeChat): Boolean = withContext(Dispatchers.IO) {
-        val finalMsg = if (message.id.isEmpty()) message.copy(id = "msg_${System.currentTimeMillis()}") else message
-        localMessages.add(finalMsg)
-
+    /*
+     * RF13: Enviar un mensaje nuevo y guardarlo en la tabla "mensajes" de Appwrite Cloud.
+     */
+    suspend fun enviarMensaje(mensaje: MensajeChat): Boolean = withContext(Dispatchers.IO) {
         try {
-            val data = mapOf(
-                "chatId" to finalMsg.chatId,
-                "petName" to finalMsg.petName,
-                "senderId" to finalMsg.senderId,
-                "senderName" to finalMsg.senderName,
-                "receiverId" to finalMsg.receiverId,
-                "text" to finalMsg.text,
-                "timestamp" to finalMsg.timestamp,
-                "isRead" to finalMsg.isRead
+            // Paso 1: Crear el mapa con las columnas en español de la tabla "mensajes"
+            val datosMensaje = mapOf(
+                "idChat" to mensaje.idChat,
+                "nombreMascota" to mensaje.nombreMascota,
+                "idEmisor" to mensaje.idEmisor,
+                "nombreEmisor" to mensaje.nombreEmisor,
+                "idReceptor" to mensaje.idReceptor,
+                "texto" to mensaje.texto.trim(),
+                "fechaHora" to mensaje.fechaHora,
+                "leido" to mensaje.leido
             )
-            ClienteAppwrite.databases.createDocument(
-                databaseId = ClienteAppwrite.DATABASE_ID,
-                collectionId = ClienteAppwrite.CHATS_COLLECTION,
+
+            // Paso 2: Guardar el mensaje en Appwrite Cloud
+            ClienteAppwrite.baseDeDatos.createDocument(
+                databaseId = ClienteAppwrite.ID_BASE_DATOS,
+                collectionId = ClienteAppwrite.TABLA_MENSAJES,
                 documentId = ID.unique(),
-                data = data
+                data = datosMensaje
             )
             true
-        } catch (e: Exception) {
-            true
+        } catch (error: Exception) {
+            error.printStackTrace()
+            false
         }
     }
 
-    suspend fun enviarMensaje(mensaje: MensajeChat): Boolean = sendMessage(mensaje)
+    suspend fun sendMessage(message: MensajeChat): Boolean = enviarMensaje(message)
 
-    // RF13: Obtener mensajes de una conversación
-    suspend fun getMessages(chatId: String, petName: String = "la mascota"): List<MensajeChat> = withContext(Dispatchers.IO) {
-        val filteredLocal = localMessages.filter { it.chatId == chatId }.sortedBy { it.timestamp }
-
+    /*
+     * RF13: Obtener el historial real de mensajes de una conversación desde Appwrite Cloud.
+     */
+    suspend fun obtenerMensajes(idChat: String, nombreMascota: String = ""): List<MensajeChat> = withContext(Dispatchers.IO) {
         try {
-            val response = ClienteAppwrite.databases.listDocuments(
-                databaseId = ClienteAppwrite.DATABASE_ID,
-                collectionId = ClienteAppwrite.CHATS_COLLECTION,
+            // Paso 1: Consultar todos los mensajes de este canal ordenados por fechaHora ascendente
+            val respuesta = ClienteAppwrite.baseDeDatos.listDocuments(
+                databaseId = ClienteAppwrite.ID_BASE_DATOS,
+                collectionId = ClienteAppwrite.TABLA_MENSAJES,
                 queries = listOf(
-                    Query.equal("chatId", chatId),
-                    Query.orderAsc("timestamp")
+                    Query.equal("idChat", idChat),
+                    Query.orderAsc("fechaHora")
                 )
             )
 
-            val cloudList = response.documents.map { doc ->
+            // Paso 2: Convertir cada documento de la nube en un objeto MensajeChat
+            respuesta.documents.map { doc ->
                 val d = doc.data
                 MensajeChat(
                     id = doc.id,
-                    chatId = d["chatId"]?.toString() ?: chatId,
-                    petName = d["petName"]?.toString() ?: petName,
-                    senderId = d["senderId"]?.toString() ?: "",
-                    senderName = d["senderName"]?.toString() ?: "",
-                    receiverId = d["receiverId"]?.toString() ?: "",
-                    text = d["text"]?.toString() ?: "",
-                    timestamp = (d["timestamp"] as? Number)?.toLong() ?: System.currentTimeMillis(),
-                    isRead = (d["isRead"] as? Boolean) ?: false
+                    chatId = d["idChat"]?.toString() ?: idChat,
+                    petName = d["nombreMascota"]?.toString() ?: nombreMascota,
+                    senderId = d["idEmisor"]?.toString() ?: "",
+                    senderName = d["nombreEmisor"]?.toString() ?: "",
+                    receiverId = d["idReceptor"]?.toString() ?: "",
+                    text = d["texto"]?.toString() ?: "",
+                    timestamp = (d["fechaHora"] as? Number)?.toLong() ?: System.currentTimeMillis(),
+                    isRead = (d["leido"] as? Boolean) ?: false
                 )
             }
-
-            if (cloudList.isNotEmpty()) {
-                cloudList
-            } else if (filteredLocal.isNotEmpty()) {
-                filteredLocal
-            } else {
-                val welcome = MensajeChat(
-                    id = "init_${chatId}",
-                    chatId = chatId,
-                    petName = petName,
-                    senderId = "shelter_host",
-                    senderName = "Refugio",
-                    receiverId = "user",
-                    text = "¡Hola! Gracias por tu interés en $petName 🐾. ¿En qué horario te gustaría coordinar una visita o tienes alguna consulta?",
-                    timestamp = System.currentTimeMillis() - 1000 * 60 * 5,
-                    isRead = true
-                )
-                localMessages.add(welcome)
-                listOf(welcome)
-            }
-        } catch (e: Exception) {
-            if (filteredLocal.isNotEmpty()) {
-                filteredLocal
-            } else {
-                val welcome = MensajeChat(
-                    id = "init_${chatId}",
-                    chatId = chatId,
-                    petName = petName,
-                    senderId = "shelter_host",
-                    senderName = "Refugio",
-                    receiverId = "user",
-                    text = "¡Hola! Gracias por tu interés en $petName 🐾. ¿En qué horario te gustaría coordinar una visita o tienes alguna consulta?",
-                    timestamp = System.currentTimeMillis() - 1000 * 60 * 5,
-                    isRead = true
-                )
-                localMessages.add(welcome)
-                listOf(welcome)
-            }
+        } catch (error: Exception) {
+            error.printStackTrace()
+            emptyList()
         }
     }
 
-    suspend fun obtenerMensajes(idChat: String, nombreMascota: String = "la mascota"): List<MensajeChat> =
-        getMessages(idChat, nombreMascota)
+    suspend fun getMessages(chatId: String, petName: String = ""): List<MensajeChat> =
+        obtenerMensajes(chatId, petName)
 
-    // RF13: Suscripción Realtime a nuevos mensajes
-    fun subscribeToChat(chatId: String, onNewMessage: (MensajeChat) -> Unit): AutoCloseable {
+    /*
+     * RF13 y RF14: Suscribirse en tiempo real (WebSockets de Appwrite Realtime)
+     * para que cuando la otra persona escriba desde su celular, el mensaje
+     * aparezca instantáneamente en pantalla.
+     */
+    fun suscribirseAlChat(idChat: String, alRecibirMensaje: (MensajeChat) -> Unit): AutoCloseable {
         return try {
-            val channel = "databases.${ClienteAppwrite.DATABASE_ID}.collections.${ClienteAppwrite.CHATS_COLLECTION}.documents"
-            val subscription = ClienteAppwrite.realtime.subscribe(channel) { event ->
+            val canal = "databases.${ClienteAppwrite.ID_BASE_DATOS}.collections.${ClienteAppwrite.TABLA_MENSAJES}.documents"
+            val suscripcion = ClienteAppwrite.tiempoReal.subscribe(canal) { evento ->
                 try {
-                    val payload = event.payload
-                    val json = if (payload is Map<*, *>) JSONObject(payload) else JSONObject(payload.toString())
-                    val msgChatId = json.optString("chatId")
-                    if (msgChatId == chatId) {
-                        val newMsg = MensajeChat(
+                    val carga = evento.payload
+                    val json = if (carga is Map<*, *>) JSONObject(carga) else JSONObject(carga.toString())
+                    val idChatMensaje = json.optString("idChat")
+
+                    // Si el mensaje entrante pertenece a esta conversación, lo entregamos a la vista
+                    if (idChatMensaje == idChat) {
+                        val nuevoMensaje = MensajeChat(
                             id = json.optString("\$id", ID.unique()),
-                            chatId = msgChatId,
-                            petName = json.optString("petName"),
-                            senderId = json.optString("senderId"),
-                            senderName = json.optString("senderName"),
-                            receiverId = json.optString("receiverId"),
-                            text = json.optString("text"),
-                            timestamp = json.optLong("timestamp", System.currentTimeMillis()),
-                            isRead = json.optBoolean("isRead", false)
+                            chatId = idChatMensaje,
+                            petName = json.optString("nombreMascota"),
+                            senderId = json.optString("idEmisor"),
+                            senderName = json.optString("nombreEmisor"),
+                            receiverId = json.optString("idReceptor"),
+                            text = json.optString("texto"),
+                            timestamp = json.optLong("fechaHora", System.currentTimeMillis()),
+                            isRead = json.optBoolean("leido", false)
                         )
-                        onNewMessage(newMsg)
+                        alRecibirMensaje(nuevoMensaje)
                     }
-                } catch (e: Exception) {
-                    e.printStackTrace()
+                } catch (error: Exception) {
+                    error.printStackTrace()
                 }
             }
-            AutoCloseable { subscription.close() }
-        } catch (e: Exception) {
+            AutoCloseable { suscripcion.close() }
+        } catch (_: Exception) {
             AutoCloseable { }
         }
     }
 
-    fun suscribirseAlChat(idChat: String, alRecibirMensaje: (MensajeChat) -> Unit): AutoCloseable =
-        subscribeToChat(idChat, alRecibirMensaje)
+    fun subscribeToChat(chatId: String, onNewMessage: (MensajeChat) -> Unit): AutoCloseable =
+        suscribirseAlChat(chatId, onNewMessage)
 }
 
 typealias AppwriteChatRepository = RepositorioChatAppwrite
