@@ -28,6 +28,7 @@ import com.example.app_adopcion_d_mascotas.datos.modelos.RolUsuario
 import com.example.app_adopcion_d_mascotas.datos.modelos.User
 import com.example.app_adopcion_d_mascotas.datos.modelos.UserRole
 import com.example.app_adopcion_d_mascotas.datos.modelos.Usuario
+import com.example.app_adopcion_d_mascotas.ui.componentes.EstadoVacio
 import com.example.app_adopcion_d_mascotas.ui.modelovista.ModeloSolicitudes
 import com.example.app_adopcion_d_mascotas.ui.modelovista.RequestsViewModel
 
@@ -97,37 +98,14 @@ fun AppointmentsScreen(
             if (estaCargando) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             } else if (listaCitas.isEmpty()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CalendarMonth,
-                        contentDescription = null,
-                        modifier = Modifier.size(64.dp),
-                        tint = MaterialTheme.colorScheme.outline
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "No hay citas programadas",
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 16.sp,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = if (currentUser?.role == UserRole.REFUGIO)
-                            "Puedes agendar entrevistas con los postulantes desde el Panel de Solicitudes."
-                        else
-                            "Cuando un refugio agende una entrevista para tu postulación, aparecerá aquí.",
-                        fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.outline,
-                        modifier = Modifier.padding(horizontal = 24.dp)
-                    )
-                }
+                EstadoVacio(
+                    icono = Icons.Default.CalendarMonth,
+                    titulo = "No hay citas programadas",
+                    descripcion = if (currentUser?.role == UserRole.REFUGIO)
+                        "Puedes agendar entrevistas con los postulantes desde el Panel de Solicitudes."
+                    else
+                        "Cuando un refugio agende una entrevista para tu postulación, aparecerá aquí."
+                )
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),

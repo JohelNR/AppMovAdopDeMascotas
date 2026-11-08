@@ -31,6 +31,7 @@ import com.example.app_adopcion_d_mascotas.datos.modelos.SolicitudAdopcion
 import com.example.app_adopcion_d_mascotas.datos.modelos.User
 import com.example.app_adopcion_d_mascotas.datos.modelos.UserRole
 import com.example.app_adopcion_d_mascotas.datos.modelos.Usuario
+import com.example.app_adopcion_d_mascotas.ui.componentes.EstadoVacio
 import com.example.app_adopcion_d_mascotas.ui.modelovista.FeedViewModel
 import com.example.app_adopcion_d_mascotas.ui.modelovista.ModeloCatalogo
 import com.example.app_adopcion_d_mascotas.ui.modelovista.ModeloSolicitudes
@@ -133,40 +134,14 @@ fun RequestsScreen(
             if (estaCargando) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             } else if (solicitudes.isEmpty()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Email,
-                        contentDescription = null,
-                        modifier = Modifier.size(64.dp),
-                        tint = MaterialTheme.colorScheme.outline
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = if (currentUser?.role == UserRole.REFUGIO)
-                            "No has recibido solicitudes aún"
-                        else
-                            "No has enviado solicitudes de adopción aún",
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 16.sp,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = if (currentUser?.role == UserRole.REFUGIO)
-                            "Cuando los adoptantes postulen a tus mascotas publicadas, aparecerán aquí."
-                        else
-                            "Explora el catálogo y postula a la mascota que desees acoger en tu hogar.",
-                        fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.outline,
-                        modifier = Modifier.padding(horizontal = 24.dp)
-                    )
-                }
+                EstadoVacio(
+                    icono = Icons.Default.Email,
+                    titulo = if (currentUser?.role == UserRole.REFUGIO) "No has recibido solicitudes aún" else "No has enviado solicitudes de adopción aún",
+                    descripcion = if (currentUser?.role == UserRole.REFUGIO)
+                        "Cuando los adoptantes postulen a tus mascotas publicadas, aparecerán aquí."
+                    else
+                        "Explora el catálogo y postula a la mascota que desees acoger en tu hogar."
+                )
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),

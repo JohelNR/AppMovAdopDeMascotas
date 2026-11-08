@@ -48,31 +48,39 @@ fun PantallaFormularioAdopcion(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Solicitud de Adopción") },
+                title = {
+                    Text(
+                        text = "Solicitud de Adopción",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = alVolver) {
-                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás")
+                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Regresar")
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
             )
         }
-    ) { paddingValues ->
+    ) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues),
+                .padding(innerPadding),
             contentAlignment = Alignment.TopCenter
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .widthIn(max = 700.dp)
+                    .widthIn(max = 680.dp)
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp)
+                    .padding(horizontal = 24.dp, vertical = 8.dp)
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(18.dp)
             ) {
-            Spacer(modifier = Modifier.height(4.dp))
 
             // Resumen de la mascota a adoptar
             Card(
